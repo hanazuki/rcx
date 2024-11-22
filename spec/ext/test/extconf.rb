@@ -1,7 +1,7 @@
 require 'rcx/mkmf'
 
 $CXXFLAGS << ' --std=c++20'
-$CXXFLAGS << ' -Werror'
+$CXXFLAGS << ' -Werror=return-type'
 $CXXFLAGS << ' -g3'
 
 if checking_for("-MJ flag") { try_compile('', ' -MJtmp.json') }
