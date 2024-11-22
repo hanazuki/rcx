@@ -8,30 +8,50 @@ on:
     - cron: '0 15 * * 5'
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
-    name: Ruby ${{ matrix.ruby }} ${{ matrix.cxx }}
-    strategy:
-      matrix:
-        ruby:
-          - '3.3'
-          - '3.4.0-preview2'
-        cxx:
-          - clang++
-          - g++
-
+  matrix:
+    outputs:
+      json: ${{ steps.read-matrix.outputs.json }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
-      - name: Compiler version
+          repository: hanazuki/ruby-builder
+      - id: read-matrix
         run: |
-          "$CXX" --version
+          echo "json=$(cat matrix.json)" >>"$GITHUB_OUTPUT"
+
+  build:
+    needs: matrix
+    runs-on: ubuntu-24.04
+    name: ruby-${{ matrix.ruby }} ${{ matrix.cxx }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{fromJson(needs.matrix.outputs.json)}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oras-project/setup-oras@v1
+      - name: Log in to ghcr.io
+        run: |
+          printenv GITHUB_TOKEN | oras login ghcr.io --username gh --password-stdin
         env:
-          CXX: ${{ matrix.cxx }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Ruby
+        run: |
+          mkdir -p "$PREFIX"
+
+          pushd /tmp
+          oras pull "$TAG"
+          tar xf ruby.tar.zst -C "$PREFIX"
+          popd
+
+          echo "$PREFIX/bin" >>"$GITHUB_PATH"
+        env:
+          TAG: ${{ matrix.artifact_tag }}
+          PREFIX: ${{ matrix.install_prefix }}
+      - name: Show environment
+        run: |
+          bundle env
       - name: Compile extensions
         run: |
           bundle exec rake compile
