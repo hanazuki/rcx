@@ -1,0 +1,956 @@
+#include <concepts>
+#include <cstring>
+#include <exception>
+#include <format>
+#include <functional>
+#include <memory>
+#include <ranges>
+#include <span>
+#include <stdexcept>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
+#include <typeinfo>
+#include <utility>
+
+#include <rcx/internal/rcx.hpp>
+#include <ffi.h>
+
+#if HAVE_CXXABI_H
+#include <cxxabi.h>
+#endif
+
+namespace rcx {
+  namespace detail {
+#if HAVE_ABI___CXA_DEMANGLE
+    static bool constexpr have_abi_cxa_demangle = true;
+#else
+    static bool constexpr have_abi_cxa_demangle = false;
+#endif
+#if HAVE_ABI___CXA_CURRENT_EXCEPTION_TYPE
+    static bool constexpr have_abi_cxa_current_exception_type = true;
+#else
+    static bool constexpr have_abi_cxa_current_exception_type = false;
+#endif
+
+    auto cxx_protect(std::invocable<> auto const &functor) noexcept
+        -> std::invoke_result_t<decltype(functor)>;
+
+    inline NativeRbFunc *alloc_callback(std::function<RbFunc> f) {
+      static std::array argtypes = {
+        &ffi_type_sint,     // argc
+        &ffi_type_pointer,  // argv
+        &ffi_type_pointer,  // self
+      };
+      static ffi_cif cif = [] {
+        ffi_cif cif;
+        if(ffi_prep_cif(&cif, FFI_DEFAULT_ABI, argtypes.size(), &ffi_type_pointer,
+               argtypes.data()) != FFI_OK) {
+          throw std::runtime_error("ffi_prep_cif failed");
+        }
+        return cif;
+      }();
+      static auto const trampoline = [](ffi_cif *, void *ret, void *args[], void *function) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        auto argc = *reinterpret_cast<int *>(args[0]);
+        auto argv = *reinterpret_cast<Value **>(args[1]);
+        auto self = *reinterpret_cast<Value *>(args[2]);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        *reinterpret_cast<Value *>(ret) = cxx_protect([&] {
+          return (*reinterpret_cast<decltype(f) *>(function))(std::span<Value>(argv, argc), self);
+        });
+      };
+
+      void *callback = nullptr;
+      auto closure = static_cast<ffi_closure *>(ffi_closure_alloc(sizeof(ffi_closure), &callback));
+
+      if(!closure) {
+        throw std::runtime_error{"ffi_closure_alloc failed"};
+      }
+
+      if(ffi_prep_closure_loc(closure, &cif, trampoline,
+             new decltype(f)(std::move(f)),  // let it leak
+             &callback) != FFI_OK) {
+        throw std::runtime_error{"ffi_prep_closure_loc failed"};
+      }
+
+      return reinterpret_cast<NativeRbFunc *>(callback);
+    }
+
+    template <typename... ArgSpec> struct method_callback {
+      template <typename F> static NativeRbFunc *alloc(F &&function) {
+        return alloc_callback([function](std::span<Value> args, Value self) -> Value {
+          Parser<ArgSpec...> parser{args, self};
+          using Result = decltype(parser.parse(detail::unsafe_ruby(), std::move(function)));
+          if constexpr(std::is_void_v<Result>) {
+            parser.parse(detail::unsafe_ruby(), std::move(function));
+            return {};
+          } else {
+            return into_Value<Result>(parser.parse(detail::unsafe_ruby(), function));
+          }
+        });
+      }
+    };
+
+    template <concepts::ArgSpec... ArgSpec>
+    decltype(auto) Parser<ArgSpec...>::parse(
+        Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func) {
+      // Experssions in an initializer list is evaluated from left to right, in contrast to
+      // function arguments.
+      return std::apply(std::forward<decltype(func)>(func),
+          std::tuple<typename ArgSpec::ResultType...>{ArgSpec::parse(ruby, self, args)...});
+    }
+
+    inline void check_jump_tag(int state) {
+      enum {
+        RUBY_TAG_NONE = 0,
+        RUBY_TAG_RAISE = 6,
+      };
+
+      switch(state) {
+      case RUBY_TAG_NONE:
+        return;
+      case RUBY_TAG_RAISE: {
+        auto err = detail::unsafe_coerce<Value>(rb_errinfo());
+        rb_set_errinfo(RUBY_Qnil);
+        throw RubyError(err);
+      }
+      default:
+        throw Jump(state);
+      }
+    }
+
+    template <typename F> inline auto protect(F functor) -> auto {
+      int state = 0;
+
+      using Result = std::invoke_result_t<F>;
+      if constexpr(std::is_void_v<Result>) {
+        ::rb_protect(
+            [](VALUE callback) {
+              (*reinterpret_cast<F *>(callback))();
+              return RUBY_Qnil;
+            },
+            reinterpret_cast<VALUE>(&functor), &state);
+        check_jump_tag(state);
+        return;
+      } else {
+        std::optional<Result> result;
+        auto callback = [&functor, &result]() { *result = functor(); };
+        using Callback = decltype(callback);
+
+        ::rb_protect(
+            [](VALUE callback) {
+              (*reinterpret_cast<Callback *>(callback))();
+              return RUBY_Qnil;
+            },
+            reinterpret_cast<VALUE>(&callback), &state);
+        check_jump_tag(state);
+        return std::move(*result);
+      }
+    }
+
+    template <typename A, typename R>
+      requires(std::is_integral_v<A> && sizeof(A) == sizeof(VALUE) && std::is_integral_v<R> &&
+               sizeof(R) == sizeof(VALUE))
+    inline R protect(R (*func)(A), A arg) {
+      int state = 0;
+
+      auto result = reinterpret_cast<R>(::rb_protect(
+          reinterpret_cast<VALUE (*)(VALUE)>(func), reinterpret_cast<VALUE>(arg), &state));
+      check_jump_tag(state);
+      return result;
+    }
+
+    /**
+     * Assumes the (C) function doesn't throw C++ exceptions.
+     */
+    template <typename R, typename... A>
+    auto assume_noexcept(R (*f)(A...)) noexcept -> R (*)(A...) noexcept {
+      return reinterpret_cast<R (*)(A...) noexcept>(f);
+    }
+    template <typename R, typename... A>
+    auto assume_noexcept(R (*f)(A..., ...)) noexcept -> R (*)(A..., ...) noexcept {
+      return reinterpret_cast<R (*)(A..., ...) noexcept>(f);
+    }
+
+    /**
+     * Converts anything into ID.
+     *
+     * Do not store the return value. Dynamic IDs may be garbage-collected.
+     */
+    template <concepts::Identifier I> inline decltype(auto) into_ID(I &&id) noexcept {
+      if constexpr(requires {
+                     { id.as_ID() } noexcept -> std::same_as<ID>;
+                   }) {
+        return id.as_ID();
+      } else {
+        return Symbol(std::forward<decltype(id)>(id)).as_ID();
+      }
+    }
+
+  };
+
+  namespace arg {
+    template <concepts::ConvertibleFromValue T>
+    inline typename Self<T>::ResultType Self<T>::parse(Ruby &, Value self, std::span<Value> &) {
+      return from_Value<T>(self);
+    }
+
+    template <concepts::ConvertibleFromValue T, detail::cxstring name>
+    inline typename Arg<T, name>::ResultType Arg<T, name>::parse(
+        Ruby &, Value, std::span<Value> &args) {
+      if(args.empty()) {
+        rb_raise(rb_eArgError, "Missing required argument (%s)", name.data());
+      }
+      auto arg = from_Value<T>(args.front());
+      args = std::ranges::drop_view(args, 1);
+      return arg;
+    }
+
+    template <concepts::ConvertibleFromValue T, detail::cxstring name>
+    inline typename ArgOpt<T, name>::ResultType ArgOpt<T, name>::parse(
+        Ruby &, Value, std::span<Value> &args) {
+      if(args.empty()) {
+        return std::nullopt;
+      }
+      auto arg = from_Value<T>(args.front());
+      args = std::ranges::drop_view(args, 1);
+      return arg;
+    }
+
+    template <concepts::ConvertibleFromValue T>
+    inline typename ArgSplat<T>::ResultType ArgSplat<T>::parse(
+        Ruby &, Value, std::span<Value> &args) {
+      typename ArgSplat<T>::ResultType values;
+      values.reserve(args.size());
+      while(!args.empty()) {
+        values.push_back(from_Value<T>(args.front()));
+        args = std::ranges::drop_view(args, 1);
+      }
+      return args;
+    }
+  }
+
+  namespace convert {
+    template <typename T> inline Value into_Value(T value) {
+      if constexpr(std::convertible_to<T, Value>) {
+        return value;
+      } else {
+        return IntoValue<std::remove_reference_t<T>>().convert(std::forward<T>(value));
+      }
+    }
+    template <typename T> inline auto from_Value(Value value) -> auto {
+      if constexpr(std::convertible_to<Value, T>) {
+        return value;
+      } else {
+        return FromValue<std::remove_reference_t<T>>().convert(value);
+      }
+    }
+
+    inline bool FromValue<bool>::convert(Value value) {
+      return RB_TEST(value.as_VALUE());
+    }
+    inline Value IntoValue<bool>::convert(bool value) {
+      return detail::unsafe_coerce<Value>(value ? RUBY_Qtrue : RUBY_Qfalse);
+    };
+
+#define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                         \
+  inline TYPE FromValue<TYPE>::convert(Value value) {                                              \
+    return detail::protect([v = value.as_VALUE()] { return FROM_VALUE(v); });                      \
+  }                                                                                                \
+  inline Value IntoValue<TYPE>::convert(TYPE value) {                                              \
+    return detail::unsafe_coerce<Value>(INTO_VALUE(value));                                        \
+  }
+
+    RCX_DEFINE_CONV(short, RB_NUM2SHORT, RB_INT2FIX);
+    RCX_DEFINE_CONV(unsigned short, RB_NUM2USHORT, RB_INT2FIX);
+    RCX_DEFINE_CONV(int, RB_NUM2INT, RB_INT2NUM);
+    RCX_DEFINE_CONV(unsigned int, RB_NUM2UINT, RB_UINT2NUM);
+    RCX_DEFINE_CONV(long, RB_NUM2LONG, RB_LONG2NUM);
+    RCX_DEFINE_CONV(unsigned long, RB_NUM2ULONG, RB_ULONG2NUM);
+    RCX_DEFINE_CONV(long long, RB_NUM2LL, RB_LL2NUM);
+    RCX_DEFINE_CONV(unsigned long long, RB_NUM2ULL, RB_ULL2NUM);
+    RCX_DEFINE_CONV(double, rb_num2dbl, rb_float_new);
+
+#undef RCX_DEFINE_CONV
+
+    template <std::derived_from<typed_data::WrappedStructBase> T>
+    inline std::reference_wrapper<T> FromValue<T>::convert(Value value) {
+      if constexpr(!std::is_const_v<T>) {
+        detail::protect([&] { ::rb_check_frozen(value.as_VALUE()); });
+      }
+      auto const data = rb_check_typeddata(value.as_VALUE(), typed_data::DataType<T>::get());
+      if(!data) {
+        throw std::runtime_error{"Object is not initialized yet"};
+      }
+      return std::ref(*static_cast<T *>(data));
+    }
+
+    template <std::derived_from<typed_data::TwoWayAssociation> T>
+    inline Value IntoValue<T>::convert(T &value) {
+      if(auto const v = value.get_associated_value()) {
+        return *v;
+      }
+      throw std::runtime_error{"This object is not managed by Ruby"};
+    }
+  }
+
+  namespace typed_data {
+    template <typename T> void dmark(gc::Marking, T *) noexcept {
+      // noop
+    }
+    template <typename T> void dfree(T *p) noexcept {
+      delete p;
+    }
+    template <typename T> size_t dsize(T const *) noexcept {
+      return sizeof(T);
+    }
+    template <typename T> void dcompact(gc::Compaction, T *) noexcept {
+      // noop
+    }
+
+    template <typename T, typename S>
+    inline ClassT<T> bind_data_type(ClassT<T> klass, ClassT<S> superclass) {
+      if constexpr(std::derived_from<T, typed_data::WrappedStructBase>) {
+        rb_data_type_t const *parent = nullptr;
+        if constexpr(!std::derived_from<S, Value>) {
+          parent = DataType<S>::get();
+
+          if(reinterpret_cast<VALUE>(parent->data) != superclass.as_VALUE()) {
+            throw std::runtime_error("superclass has mismatching static type");
+          }
+        }
+
+        DataType<T>::bind(klass, parent);
+      }
+      return klass;
+    }
+
+    template <typename T> inline rb_data_type_t const *DataTypeStorage<T>::get() {
+      if(!data_type_)
+        throw std::runtime_error(
+            std::format("Type '{}' is not yet bound to a Ruby Class", typeid(T).name()));
+      return &*data_type_;
+    }
+
+    template <typename T>
+    inline void DataTypeStorage<T>::bind(ClassT<T> klass, rb_data_type_t const *parent) {
+      if(data_type_) {
+        throw std::runtime_error{"This type is already bound to a Ruby Class"};
+      }
+
+      data_type_ = rb_data_type_t{
+        .wrap_struct_name = strdup(klass.name().data()),  // let it leek
+        .function = {
+          .dmark =
+              [](void *p) {
+                using typed_data::dmark;
+                dmark(gc::Marking(), static_cast<T *>(p));
+              },
+          .dfree =
+              [](void *p) {
+                using typed_data::dfree;
+                dfree(static_cast<T *>(p));
+              },
+          .dsize =
+              [](void const *p) {
+                using typed_data::dsize;
+                return dsize(static_cast<T const *>(p));
+              },
+          .dcompact =
+              [](void *p) {
+                using typed_data::dcompact;
+                dcompact(gc::Compaction(), static_cast<T *>(p));
+              },
+          // .reserved is zero-initialized
+        },
+        .parent = parent,
+        .data = reinterpret_cast<void *>(klass.as_VALUE()),
+        .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+      };
+      ::rb_gc_register_address(reinterpret_cast<VALUE *>(&data_type_->data));
+
+      ::rb_define_alloc_func(klass.as_VALUE(),
+          [](VALUE klass) { return ::rb_data_typed_object_wrap(klass, nullptr, get()); });
+    }
+
+    template <std::derived_from<TwoWayAssociation> T>
+    inline void dmark(gc::Marking gc, T *p) noexcept {
+      if(auto v = p->get_associated_value()) {
+        gc.mark_movable(*v);
+      }
+    }
+
+    template <std::derived_from<TwoWayAssociation> T>
+    inline void dcompact(gc::Compaction gc, T *p) noexcept {
+      p->replace_associated_value([gc](Value v) noexcept { return gc.new_location(v); });
+    }
+  }
+
+  namespace gc {
+    inline void Marking::mark_movable(Value value) const noexcept {
+      ::rb_gc_mark_movable(value.as_VALUE());
+    }
+    inline void Marking::mark_pinned(Value value) const noexcept {
+      ::rb_gc_mark(value.as_VALUE());
+    }
+
+    template <std::derived_from<ValueBase> T> T Compaction::new_location(T value) const noexcept {
+      return detail::unsafe_coerce<T>(::rb_gc_location(value.as_VALUE()));
+    }
+  }
+
+  /// Id
+
+  inline Id::Id(ID id): id_(id) {
+  }
+
+  inline ID Id::as_ID() const noexcept {
+    return id_;
+  }
+
+  /// Built-ins
+
+  namespace builtin {
+    inline value::Class NilClass() {
+      return detail::unsafe_coerce<value::Class>(::rb_cNilClass);
+    }
+    inline value::Class TrueClass() {
+      return detail::unsafe_coerce<value::Class>(::rb_cTrueClass);
+    }
+    inline value::Class FalseClass() {
+      return detail::unsafe_coerce<value::Class>(::rb_cFalseClass);
+    }
+    inline ClassT<value::Module> Module() {
+      return detail::unsafe_coerce<ClassT<value::Module>>(::rb_cModule);
+    }
+    inline ClassT<value::Class> Class() {
+      return detail::unsafe_coerce<ClassT<value::Class>>(::rb_cClass);
+    }
+    inline value::Class Object() {
+      return detail::unsafe_coerce<value::Class>(::rb_cObject);
+    }
+    inline ClassT<value::String> String() {
+      return detail::unsafe_coerce<ClassT<value::String>>(::rb_cString);
+    }
+    inline value::Class RuntimeError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eRuntimeError);
+    }
+  }
+
+  namespace value {
+    /// ValueBase
+
+    inline constexpr ValueBase::ValueBase(): value_(RUBY_Qnil) {
+    }
+
+    inline constexpr ValueBase::ValueBase(VALUE value): value_(value) {
+    }
+
+    inline constexpr VALUE ValueBase::as_VALUE() const {
+      return value_;
+    }
+
+    inline bool ValueBase::is_nil() const {
+      return RB_NIL_P(value_);
+    }
+
+    inline bool ValueBase::is_frozen() const {
+      return ::rb_obj_frozen_p(as_VALUE());
+    }
+
+    template <typename T> inline bool ValueBase::is_instance_of(ClassT<T> klass) const {
+      return detail::protect(
+          [&] { return RBTEST(::rb_obj_is_instance_of(as_VALUE(), klass.as_VALUE())); });
+    }
+
+    template <typename T> inline bool ValueBase::is_kind_of(ClassT<T> klass) const {
+      return detail::protect(
+          [&] { return RBTEST(::rb_obj_is_kind_of(as_VALUE(), klass.as_VALUE())); });
+    }
+
+    /// ValueT
+
+    template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
+    ClassT<Derived> ValueT<Derived, Super, nilable>::get_class() const {
+      return detail::unsafe_coerce<ClassT<Derived>>(
+          detail::protect(::rb_obj_class, this->as_VALUE()));
+    }
+
+    template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
+    Derived ValueT<Derived, Super, nilable>::freeze() const {
+      return detail::unsafe_coerce<Derived>(detail::protect(::rb_obj_freeze, this->as_VALUE()));
+    }
+
+    template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
+    template <concepts::ConvertibleFromValue Self, concepts::ArgSpec... ArgSpec>
+    inline Derived ValueT<Derived, Super, nilable>::define_singleton_method(
+        concepts::Identifier auto &&mid,
+        std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
+      auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(
+          std::forward<decltype(function)>(function));
+      detail::protect([&] {
+        auto const singleton = ::rb_singleton_class(this->as_VALUE());
+        rb_define_method_id(
+            singleton, detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
+      });
+      return *static_cast<Derived const *>(this);
+    }
+
+    /// Value
+
+    template <concepts::ConvertibleFromValue R>
+    inline R Value::send(
+        concepts::Identifier auto &&mid, concepts::ConvertibleIntoValue auto &&...args) const {
+      return from_Value<R>(detail::unsafe_coerce<Value>(detail::protect([&] {
+        return ::rb_funcall(as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)),
+            sizeof...(args), into_Value(std::forward<decltype(args)>(args)).as_VALUE()...);
+      })));
+    }
+
+    inline String Value::inspect() const {
+      return detail::unsafe_coerce<String>(
+          detail::protect([&] { return ::rb_inspect(as_VALUE()); }));
+    }
+
+    inline Value const Value::qnil = {RUBY_Qnil};
+    inline Value const Value::qtrue = {RUBY_Qtrue};
+    inline Value const Value::qfalse = {RUBY_Qfalse};
+    inline Value const Value::qundef = {RUBY_Qundef};
+  }
+
+  /// Module
+
+  namespace value {
+    inline Module Module::define_module(concepts::Identifier auto &&name) const {
+      return detail::unsafe_coerce<Module>(::rb_define_module_id_under(
+          as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name))));
+    }
+
+    inline String Module::name() const {
+      return detail::unsafe_coerce<String>(::rb_class_path(as_VALUE()));
+    }
+
+    template <typename T, typename S>
+    inline ClassT<T> Module::define_class(
+        concepts::Identifier auto &&name, ClassT<S> superclass) const {
+      ClassT<T> klass = detail::unsafe_coerce<ClassT<T>>(detail::protect([&] {
+        return ::rb_define_class_id_under(
+            as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)), superclass.as_VALUE());
+      }));
+      return typed_data::bind_data_type(klass, superclass);
+    }
+
+    template <typename T>
+    inline ClassT<T> Module::define_class(concepts::Identifier auto &&name) const {
+      return define_class<T>(std::forward<decltype(name)>(name), builtin::Object());
+    }
+
+    template <concepts::ConvertibleFromValue Self, concepts::ArgSpec... ArgSpec>
+    inline Module Module::define_method(concepts::Identifier auto &&mid,
+        std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
+      auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(function);
+      detail::protect([&] {
+        rb_define_method_id(
+            as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
+      });
+      return *this;
+    }
+
+    inline Module Module::new_module() {
+      return detail::unsafe_coerce<Module>(detail::protect([] { return ::rb_module_new(); }));
+    }
+
+    inline bool Module::const_defined(concepts::Identifier auto &&name) const {
+      return detail::protect([&] {
+        return ::rb_const_defined(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
+      });
+    }
+
+    template <concepts::ConvertibleFromValue T>
+    inline T Module::const_get(concepts::Identifier auto &&name) const {
+      return from_Value<T>(detail::unsafe_coerce<Value>(detail::protect([&] {
+        return ::rb_const_get(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
+      })));
+    }
+
+    inline void Module::const_set(
+        concepts::Identifier auto &&name, concepts::ConvertibleIntoValue auto &&value) const {
+      auto const v = into_Value(std::forward<decltype(value)>(value));
+      return detail::protect([&] {
+        ::rb_const_set(
+            as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)), v.as_VALUE());
+      });
+    }
+  }
+
+  inline Module convert::FromValue<Module>::convert(Value value) {
+    auto const type = ::rb_type(value.as_VALUE());
+    if(type != RUBY_T_MODULE && type != RUBY_T_CLASS) {
+      rb_raise(rb_eTypeError, "Expected a Module but got a %s", rb_obj_classname(value.as_VALUE()));
+    }
+    return detail::unsafe_coerce<Module>{value.as_VALUE()};
+  };
+
+  /// Class
+
+  namespace value {
+    template <typename T>
+    inline auto ClassT<T>::new_instance(concepts::ConvertibleIntoValue auto &&...args) const
+        -> auto {
+      static_assert(std::derived_from<T, ValueBase>);
+
+      std::array<VALUE, sizeof...(args)> vargs{
+        into_Value(std::forward<decltype(args)>(args)).as_VALUE()...};
+      return detail::unsafe_coerce<T>(detail::protect(
+          [&] { return ::rb_class_new_instance(vargs.size(), vargs.data(), this->as_VALUE()); }));
+    }
+
+    template <typename T>
+    template <concepts::ArgSpec... ArgSpec>
+    inline ClassT<T> ClassT<T>::define_method(concepts::Identifier auto &&mid,
+        std::invocable<T &, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
+      auto const callback = detail::method_callback<arg::Self<T &>, ArgSpec...>::alloc(
+          std::forward<decltype(function)>(function));
+      detail::protect([&]() {
+        rb_define_method_id(
+            this->as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
+      });
+      return *this;
+    }
+
+    template <typename T>
+    template <concepts::ArgSpec... ArgSpec>
+    inline ClassT<T> ClassT<T>::define_method_const(concepts::Identifier auto &&mid,
+        std::invocable<T const &, typename ArgSpec::ResultType...> auto &&function,
+        ArgSpec...) const {
+      auto const callback =
+          detail::method_callback<arg::Self<T const &>, ArgSpec...>::alloc(function);
+      detail::protect([&] {
+        rb_define_method_id(
+            this->as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
+      });
+      return *this;
+    }
+
+    template <typename T>
+    template <concepts::ArgSpec... ArgSpec>
+      requires std::constructible_from<T, typename ArgSpec::ResultType...>
+    inline ClassT<T> ClassT<T>::define_constructor(ArgSpec...) const {
+      auto const factory = []<typename... A>(Value self, A &&...args) -> Value {
+        auto data = new T(std::forward<A>(args)...);
+        RTYPEDDATA_DATA(self.as_VALUE()) = data;  // Tracked by Ruby GC
+        if constexpr(std::derived_from<T, typed_data::TwoWayAssociation>) {
+          data->associate_value(self);
+        }
+        return Value::qnil;
+      };
+
+      auto const callback = detail::method_callback<arg::Self<Value>, ArgSpec...>::alloc(factory);
+      detail::protect([&] {
+        using namespace literals;
+        rb_define_method_id(this->as_VALUE(), detail::into_ID("initialize"_id), callback, -1);
+      });
+      return *this;
+    }
+
+    template <typename T> inline Class ClassT<T>::new_class() {
+      return new_class(builtin::Object());
+    }
+    template <typename T>
+    template <typename S>
+    inline ClassT<S> ClassT<T>::new_class(ClassT<S> superclass) {
+      return detail::unsafe_coerce<ClassT<S>>(
+          detail::protect(::rb_class_new, superclass.as_VALUE()));
+    }
+  }
+
+  template <typename T> ClassT<T> convert::FromValue<ClassT<T>>::convert(Value value) {
+    if(::rb_type(value.as_VALUE()) != RUBY_T_CLASS) {
+      rb_raise(rb_eTypeError, "Expected a Class but got a %s", rb_obj_classname(value.as_VALUE()));
+    }
+    return detail::unsafe_coerce<ClassT<T>>{value.as_VALUE()};
+  };
+
+  /// Symbol
+
+  namespace value {
+    template <size_t N> inline Symbol::Symbol(char const (&s)[N]) noexcept: Symbol({&s[0], N - 1}) {
+    }
+
+    inline Symbol::Symbol(std::string_view sv) noexcept
+        : Symbol(detail::protect([&] {
+            return detail::assume_noexcept(::rb_to_symbol)(
+                detail::assume_noexcept(::rb_interned_str)(sv.data(), sv.size()));
+          })) {
+    }
+
+    inline ID Symbol::as_ID() const noexcept {
+      return detail::protect(::rb_sym2id, as_VALUE());
+    }
+  }
+
+  inline Symbol convert::FromValue<Symbol>::convert(Value value) {
+    if(::rb_type(value.as_VALUE()) != RUBY_T_SYMBOL) {
+      rb_raise(rb_eTypeError, "Expected a Symbol but got a %s", rb_obj_classname(value.as_VALUE()));
+    }
+    return detail::unsafe_coerce<Symbol>(value.as_VALUE());
+  }
+
+  /// String
+
+  namespace value {
+    template <concepts::StringLike S> inline String String::intern_from(S &&s) {
+      using CharT = typename std::remove_cvref_t<S>::value_type;
+      using Traits = typename std::remove_cvref_t<S>::traits_type;
+      std::basic_string_view<CharT, Traits> sv(std::forward<S>(s));
+      return detail::unsafe_coerce<String>(detail::protect([&] {
+        return (::rb_enc_interned_str)(
+            reinterpret_cast<char const *>(sv.data()), sv.size(), CharTraits<CharT>::encoding());
+      }));
+    }
+
+    template <concepts::CharLike CharT> inline String String::intern_from(CharT const *s) {
+      return intern_from(std::basic_string_view<CharT>(s));
+    }
+
+    template <concepts::StringLike S> inline String String::copy_from(S &&s) {
+      using CharT = typename std::remove_cvref_t<S>::value_type;
+      using Traits = typename std::remove_cvref_t<S>::traits_type;
+      std::basic_string_view<CharT, Traits> sv(std::forward<S>(s));
+      return detail::unsafe_coerce<String>(detail::protect([&] {
+        return (::rb_enc_str_new)(
+            reinterpret_cast<char const *>(sv.data()), sv.size(), CharTraits<CharT>::encoding());
+      }));
+    }
+
+    template <concepts::CharLike CharT> inline String String::copy_from(CharT const *s) {
+      return copy_from(std::basic_string_view<CharT>(s));
+    }
+
+    inline size_t String::size() const noexcept {
+      return RSTRING_LEN(as_VALUE());
+    }
+
+    inline char *String::data() const {
+      detail::protect([&] { ::rb_check_frozen(as_VALUE()); });
+      return RSTRING_PTR(as_VALUE());
+    }
+
+    inline char const *String::cdata() const noexcept {
+      return RSTRING_PTR(as_VALUE());
+    }
+
+    inline String::operator std::string_view() const noexcept {
+      return {data(), size()};
+    }
+  }
+
+  inline String convert::FromValue<String>::convert(Value value) {
+    if(::rb_type(value.as_VALUE()) != RUBY_T_STRING) {
+      rb_raise(rb_eTypeError, "Expected a String but got a %s", rb_obj_classname(value.as_VALUE()));
+    }
+    return detail::unsafe_coerce<String>(value.as_VALUE());
+  }
+  inline std::string_view convert::FromValue<std::string_view>::convert(Value value) {
+    return {from_Value<String>(value)};
+  }
+
+  /// Pinned
+
+  namespace value {
+    template <std::derived_from<ValueBase> T> inline PinnedOpt<T>::Storage::Storage(T v): value{v} {
+      ::rb_gc_register_address(const_cast<VALUE *>(reinterpret_cast<VALUE const *>(&value)));
+    }
+
+    template <std::derived_from<ValueBase> T> inline PinnedOpt<T>::Storage::~Storage() {
+      ::rb_gc_unregister_address(const_cast<VALUE *>(reinterpret_cast<VALUE const *>(&value)));
+    }
+
+    template <std::derived_from<ValueBase> T>
+    inline PinnedOpt<T>::PinnedOpt(T value): ptr_(std::make_shared<Storage>(value)) {
+    }
+
+    template <std::derived_from<ValueBase> T> inline T &PinnedOpt<T>::operator*() const noexcept {
+      return ptr_->value;
+    }
+
+    template <std::derived_from<ValueBase> T>
+    inline T *RCX_Nullable PinnedOpt<T>::operator->() const noexcept {
+      rcx_assert(ptr_);
+      return &ptr_->value;
+    }
+
+    template <std::derived_from<ValueBase> T> inline PinnedOpt<T>::operator bool() const noexcept {
+      return ptr_;
+    }
+
+    template <std::derived_from<ValueBase> T>
+    inline Pinned<T>::Pinned(T value): PinnedOpt<T>(value) {
+    }
+
+    template <std::derived_from<ValueBase> T>
+    inline T *RCX_Nonnull Pinned<T>::operator->() const noexcept {
+      return PinnedOpt<T>::operator->();
+    }
+  }
+
+  /// Array
+
+  namespace value {
+    inline size_t Array::size() const noexcept {
+      return rb_array_len(as_VALUE());
+    }
+
+    template <concepts::ConvertibleFromValue T> inline decltype(auto) Array::at(size_t i) const {
+      return from_Value<T>((*this)[i]);
+    }
+
+    inline Value Array::operator[](size_t i) const {
+      VALUE const index = RB_SIZE2NUM(i);
+      return detail::unsafe_coerce<Value>(
+          detail::protect([&] { return ::rb_ary_aref(1, &index, as_VALUE()); }));
+      ;
+    }
+
+    template <std::ranges::contiguous_range R>
+      requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
+    inline Array Array::new_from(R const &elements) {
+      // contiguous_range<T> has a layout combatible to VALUE[]
+      return detail::unsafe_coerce<Array>(detail::protect([&] {
+        return ::rb_ary_new_from_values(
+            elements.size(), reinterpret_cast<VALUE const *>(elements.data()));
+      }));
+    };
+
+    template <typename T>
+      requires std::is_layout_compatible_v<T, ValueBase>
+    static Array new_from(std::initializer_list<T> elements) {
+      return new_from(std::span(elements));
+    }
+
+    template <std::derived_from<ValueBase>... T>
+    inline Array new_from(std::tuple<T...> const &elements) {
+      return detail::unsafe_coerce<Array>(detail::protect([&] {
+        return std::apply(
+            [](auto... v) { return ::rb_ary_new_from_args(sizeof...(v), v.as_VALUE()...); },
+            elements);
+      }));
+    }
+  }
+
+  inline Array convert::FromValue<Array>::convert(Value value) {
+    if(::rb_type(value.as_VALUE()) != RUBY_T_ARRAY) {
+      rb_raise(rb_eTypeError, "Expected an Array but got a %s", rb_obj_classname(value.as_VALUE()));
+    }
+    return detail::unsafe_coerce<Array>(value.as_VALUE());
+  }
+
+  /// Misc
+
+  namespace literals {
+    template <detail::cxstring s> String operator""_str() {
+      return String::copy_from(s);
+    }
+
+    template <detail::u8cxstring s> String operator""_str() {
+      return String::copy_from(s);
+    }
+
+    template <detail::cxstring s> String operator""_fstr() {
+      static String str = detail::unsafe_coerce<String>(detail::protect(
+          [&] { return ::rb_obj_freeze(::rb_str_new_static(s.data(), s.size())); }));
+      return str;
+    }
+
+    template <detail::u8cxstring s> String operator""_fstr() {
+      static String str = detail::unsafe_coerce<String>(detail::protect([&] {
+        return ::rb_obj_freeze(::rb_enc_str_new_static(
+            reinterpret_cast<char const *>(s.data()), s.size(), rb_utf8_encoding()));
+      }));
+      return str;
+    }
+
+    template <detail::cxstring s> Symbol operator""_sym() {
+      static Symbol sym = detail::unsafe_coerce<Symbol>(
+          detail::protect([&] { return ::rb_id2sym(operator""_id < s>().as_ID()); }));
+      return sym;
+    }
+
+    template <detail::u8cxstring s> Symbol operator""_sym() {
+      static Symbol sym = detail::unsafe_coerce<Symbol>(
+          detail::protect([&] { return ::rb_id2sym(operator""_id < s>().as_VALUE()); }));
+      return sym;
+    }
+
+    template <detail::cxstring s> Id operator""_id() {
+      static Id const id{detail::protect([&] { return ::rb_intern2(s.data(), s.size()); })};
+      return id;
+    }
+
+    template <detail::u8cxstring s> Id operator""_id() {
+      static Id const id{
+        detail::protect([&] { return ::rb_intern_str(operator""_fstr < s>().as_VALUE()); })};
+      return id;
+    }
+
+  }
+
+  /// Ruby
+
+  inline Module Ruby::define_module(concepts::Identifier auto &&name) {
+    return builtin::Object().define_module(std::forward<decltype(name)>(name));
+  }
+
+  template <typename T, typename S>
+  inline ClassT<T> Ruby::define_class(concepts::Identifier auto &&name, ClassT<S> superclass) {
+    return builtin::Object().define_class<T>(std::forward<decltype(name)>(name), superclass);
+  }
+
+  template <typename T> inline ClassT<T> Ruby::define_class(concepts::Identifier auto &&name) {
+    return define_class<T>(std::forward<decltype(name)>(name), builtin::Object());
+  }
+
+  namespace detail {
+    inline std::string demangle_type_info(std::type_info const &ti) {
+      if constexpr(have_abi_cxa_demangle) {
+        std::unique_ptr<char, decltype(&free)> const name = {
+          abi::__cxa_demangle(ti.name(), nullptr, 0, nullptr),
+          free,
+        };
+        return name.get();
+      }
+      return {};
+    }
+
+    inline Value make_ruby_exception(std::exception const *exc, std::type_info const *ti) {
+      std::string name, msg;
+      if(ti)
+        name = demangle_type_info(*ti);
+      if(exc)
+        msg = exc->what();
+      return builtin::RuntimeError().new_instance(String::copy_from(
+          std::format("{}: {}", name.empty() ? std::string{"unknown"} : name, msg)));
+    }
+
+    inline auto cxx_protect(std::invocable<> auto const &functor) noexcept
+        -> std::invoke_result_t<decltype(functor)> {
+      try {
+        return functor();
+      } catch(Jump const &jump) {
+        ::rb_jump_tag(jump.state);
+      } catch(RubyError const &exc) {
+        ::rb_exc_raise(exc.err().as_VALUE());
+      } catch(std::exception const &exc) {
+        ::rb_exc_raise(make_ruby_exception(&exc, &typeid(exc)).as_VALUE());
+      } catch(...) {
+        if constexpr(have_abi_cxa_current_exception_type) {
+          ::rb_exc_raise(
+              make_ruby_exception(nullptr, abi::__cxa_current_exception_type()).as_VALUE());
+        } else {
+          ::rb_exc_raise(make_ruby_exception(nullptr, nullptr).as_VALUE());
+        }
+      }
+    }
+  }
+}
