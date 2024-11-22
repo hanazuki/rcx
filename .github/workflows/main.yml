@@ -23,7 +23,7 @@ jobs:
   build:
     needs: matrix
     runs-on: ubuntu-24.04
-    name: ruby-${{ matrix.ruby }} ${{ matrix.cxx }}
+    name: ruby-${{ matrix.ruby }} ${{ matrix.compilers.cxx }}
     strategy:
       fail-fast: false
       matrix:
@@ -52,11 +52,12 @@ jobs:
       - name: Show environment
         run: |
           bundle env
+      - name: Install gems
+        run: |
+          bundle install
       - name: Compile extensions
         run: |
           bundle exec rake compile
-        env:
-          CXX: ${{ matrix.cxx }}
       - name: Run rspec
         run: |
           bundle exec rake spec
