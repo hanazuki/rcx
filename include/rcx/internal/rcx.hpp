@@ -138,7 +138,7 @@ namespace rcx {
       static_assert(detail::always_false_v<T>, "conversion into Value not defined");
     };
 
-#define RCX_DECLARE_CONV(TYPE)                                                                \
+#define RCX_DECLARE_CONV(TYPE)                                                                     \
   template <> struct FromValue<TYPE> {                                                             \
     TYPE convert(Value value);                                                                     \
   };                                                                                               \
@@ -526,13 +526,13 @@ namespace rcx {
       template <concepts::ConvertibleFromValue T = Value> decltype(auto) at(size_t i) const;
       Value operator[](size_t i) const;
 
+#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
       template <std::ranges::contiguous_range R>
         requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
       static Array new_from(R const &elements);
+#endif
 
-      template <typename T>
-        requires std::is_layout_compatible_v<T, ValueBase>
-      static Array new_from(std::initializer_list<T> elements);
+      static Array new_from(std::initializer_list<ValueBase> elements);
 
       template <std::derived_from<ValueBase>... T>
       static Array new_from(std::tuple<T...> const &elements);

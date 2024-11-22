@@ -35,6 +35,17 @@ if have_header('cxxabi.h')
   have_func('abi::__cxa_current_exception_type', 'cxxabi.h')
 end
 
+if checking_for("std::is_layout_compatible<>")  {
+    try_compile(<<'CXX')
+#include <type_traits>
+struct A { int a; };
+struct B { int b; };
+static_assert(std::is_layout_compatible<A, B>::value);
+CXX
+  }
+  $defs.push("-DHAVE_STD_IS_LAYOUT_COMPATIBLE=1")
+end
+
 if checking_for("nullability extension")  {
     try_compile("void *_Nullable p, *_Nonnull q;")
   }

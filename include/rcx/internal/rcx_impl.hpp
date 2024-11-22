@@ -13,8 +13,8 @@
 #include <typeinfo>
 #include <utility>
 
-#include <rcx/internal/rcx.hpp>
 #include <ffi.h>
+#include <rcx/internal/rcx.hpp>
 
 #if HAVE_CXXABI_H
 #include <cxxabi.h>
@@ -254,7 +254,7 @@ namespace rcx {
       return detail::unsafe_coerce<Value>(value ? RUBY_Qtrue : RUBY_Qfalse);
     };
 
-#define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                         \
+#define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                              \
   inline TYPE FromValue<TYPE>::convert(Value value) {                                              \
     return detail::protect([v = value.as_VALUE()] { return FROM_VALUE(v); });                      \
   }                                                                                                \
@@ -813,6 +813,7 @@ namespace rcx {
       ;
     }
 
+#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
     template <std::ranges::contiguous_range R>
       requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
     inline Array Array::new_from(R const &elements) {
@@ -822,11 +823,13 @@ namespace rcx {
             elements.size(), reinterpret_cast<VALUE const *>(elements.data()));
       }));
     };
+#endif
 
-    template <typename T>
-      requires std::is_layout_compatible_v<T, ValueBase>
-    static Array new_from(std::initializer_list<T> elements) {
-      return new_from(std::span(elements));
+    static Array new_from(std::initializer_list<ValueBase> elements) {
+      return detail::unsafe_coerce<Array>(detail::protect([&] {
+        return ::rb_ary_new_from_values(
+            elements.size(), reinterpret_cast<VALUE const *>(elements.begin()));
+      }));
     }
 
     template <std::derived_from<ValueBase>... T>
