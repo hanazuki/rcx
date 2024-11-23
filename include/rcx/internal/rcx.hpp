@@ -20,7 +20,7 @@
 #define rcx_assert(expr) assert((expr))
 #define rcx_delete(reason) delete
 
-#ifdef HAVE_NULLABILITY_FEATURE
+#ifdef HAVE_FEATURE_NULLABILITY
 #define RCX_Nullable _Nullable
 #define RCX_Nonnull _Nonnull
 #else
@@ -88,7 +88,7 @@ namespace rcx {
         std::copy_n(str, N, data_.data());
       }
 
-      constexpr value_type const *data() const {
+      constexpr value_type const *RCX_Nonnull data() const {
         return data_.data();
       }
 
@@ -112,7 +112,7 @@ namespace rcx {
         std::copy_n(str, N, data_.data());
       }
 
-      constexpr value_type const *data() const {
+      constexpr value_type const *RCX_Nonnull data() const {
         return data_.data();
       }
 
@@ -126,8 +126,8 @@ namespace rcx {
     };
 
     using RbFunc = Value(std::span<Value> args, Value self);
-    using NativeRbFunc = VALUE(int argc, VALUE *argv, VALUE self);
-    NativeRbFunc *alloc_callback(std::function<RbFunc> f);
+    using NativeRbFunc = VALUE(int argc, VALUE *RCX_Nonnull argv, VALUE self);
+    NativeRbFunc *RCX_Nonnull alloc_callback(std::function<RbFunc> f);
 
     struct Jump {
       int state;
@@ -137,7 +137,7 @@ namespace rcx {
     template <typename A, typename R>
       requires(std::is_integral_v<A> && sizeof(A) == sizeof(VALUE) && std::is_integral_v<R> &&
                sizeof(R) == sizeof(VALUE))
-    VALUE protect(VALUE (*func)(A), A arg);
+    VALUE protect(VALUE (*RCX_Nonnull func)(A), A arg);
 
     template <typename T> struct wrap_ref {
       using type = T;
@@ -529,13 +529,13 @@ namespace rcx {
       using ValueT<String, Value>::ValueT;
 
       template <concepts::StringLike S> static String intern_from(S &&s);
-      template <concepts::CharLike CharT> static String intern_from(CharT const *s);
+      template <concepts::CharLike CharT> static String intern_from(CharT const *RCX_Nonnull s);
       template <concepts::StringLike S> static String copy_from(S &&s);
-      template <concepts::CharLike CharT> static String copy_from(CharT const *s);
+      template <concepts::CharLike CharT> static String copy_from(CharT const *RCX_Nonnull s);
 
       size_t size() const noexcept;
-      char *data() const;
-      char const *cdata() const noexcept;
+      char *RCX_Nonnull data() const;
+      char const *RCX_Nonnull cdata() const noexcept;
       explicit operator std::string_view() const noexcept;
     };
 
@@ -601,10 +601,10 @@ namespace rcx {
   }
 
   namespace typed_data {
-    template <typename T> void dmark(gc::Marking, T *) noexcept;
-    template <typename T> void dfree(T *) noexcept;
-    template <typename T> size_t dsize(T const *) noexcept;
-    template <typename T> void dcompact(gc::Compaction, T *) noexcept;
+    template <typename T> void dmark(gc::Marking, T *RCX_Nonnull) noexcept;
+    template <typename T> void dfree(T *RCX_Nonnull) noexcept;
+    template <typename T> size_t dsize(T const *RCX_Nonnull) noexcept;
+    template <typename T> void dcompact(gc::Compaction, T *RCX_Nonnull) noexcept;
 
     struct AssociatedValue {
       std::optional<Value> value_;
@@ -638,9 +638,10 @@ namespace rcx {
     struct OneWayAssociation {};
     struct TwoWayAssociation: public AssociatedValue {};
 
-    template <std::derived_from<TwoWayAssociation> T> void dmark(gc::Marking gc, T *p) noexcept;
     template <std::derived_from<TwoWayAssociation> T>
-    void dcompact(gc::Compaction gc, T *p) noexcept;
+    void dmark(gc::Marking gc, T *RCX_Nonnull p) noexcept;
+    template <std::derived_from<TwoWayAssociation> T>
+    void dcompact(gc::Compaction gc, T *RCX_Nonnull p) noexcept;
 
     struct WrappedStructBase {};
 
@@ -654,8 +655,8 @@ namespace rcx {
       inline static std::optional<rb_data_type_t> data_type_;
 
     public:
-      static void bind(ClassT<T> klass, rb_data_type_t const *parent = nullptr);
-      static rb_data_type_t const *get();
+      static void bind(ClassT<T> klass, rb_data_type_t const *RCX_Nullable parent = nullptr);
+      static rb_data_type_t const *RCX_Nonnull get();
     };
 
     template <typename T> using DataType = DataTypeStorage<std::remove_cvref_t<T>>;

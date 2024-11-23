@@ -4,7 +4,6 @@ include MakeMakefile['C++']
 root = File.join(__dir__, '../..')
 
 $INCFLAGS << " -I#{File.join(root, 'include').shellescape}"
-$CXXFLAGS << " -Wno-nullability-completeness"  # TODO:
 
 $rcx_headers = Dir[File.join(root, 'include/**/*.hpp')]
 
