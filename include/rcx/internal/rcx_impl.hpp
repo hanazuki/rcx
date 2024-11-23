@@ -38,9 +38,9 @@ namespace rcx {
 
     inline NativeRbFunc *alloc_callback(std::function<RbFunc> f) {
       static std::array argtypes = {
-        &ffi_type_sint,     // argc
-        &ffi_type_pointer,  // argv
-        &ffi_type_pointer,  // self
+        &ffi_type_sint,     // int argc
+        &ffi_type_pointer,  // VALUE *argv
+        &ffi_type_pointer,  // VALUE self (has the same size as void *)
       };
       static ffi_cif cif = [] {
         ffi_cif cif;
@@ -70,7 +70,7 @@ namespace rcx {
 
       if(ffi_prep_closure_loc(closure, &cif, trampoline,
              new decltype(f)(std::move(f)),  // let it leak
-             &callback) != FFI_OK) {
+             callback) != FFI_OK) {
         throw std::runtime_error{"ffi_prep_closure_loc failed"};
       }
 
