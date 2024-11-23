@@ -36,7 +36,7 @@ namespace rcx {
     auto cxx_protect(std::invocable<> auto const &functor) noexcept
         -> std::invoke_result_t<decltype(functor)>;
 
-    inline NativeRbFunc *alloc_callback(std::function<RbFunc> f) {
+    inline NativeRbFunc *RCX_Nonnull alloc_callback(std::function<RbFunc> f) {
       static std::array argtypes = {
         &ffi_type_sint,     // int argc
         &ffi_type_pointer,  // VALUE *argv
@@ -50,7 +50,8 @@ namespace rcx {
         }
         return cif;
       }();
-      static auto const trampoline = [](ffi_cif *, void *ret, void *args[], void *function) {
+      static auto const trampoline = [](ffi_cif *RCX_Nonnull, void *RCX_Nonnull ret,
+                                         void *RCX_Nonnull args[], void *RCX_Nonnull function) {
         // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         auto argc = *reinterpret_cast<int *>(args[0]);
         auto argv = *reinterpret_cast<Value **>(args[1]);
@@ -91,7 +92,7 @@ namespace rcx {
     };
 
     template <typename... ArgSpec> struct method_callback {
-      template <typename F> static NativeRbFunc *alloc(F &&function) {
+      template <typename F> static NativeRbFunc *RCX_Nonnull alloc(F &&function) {
         return alloc_callback([function](std::span<Value> args, Value self) -> Value {
           Parser<ArgSpec...> parser{args, self};
           using Result = decltype(parser.parse(detail::unsafe_ruby(), std::move(function)));
@@ -156,11 +157,12 @@ namespace rcx {
     template <typename A, typename R>
       requires(std::is_integral_v<A> && sizeof(A) == sizeof(VALUE) && std::is_integral_v<R> &&
                sizeof(R) == sizeof(VALUE))
-    inline R protect(R (*func)(A), A arg) {
+    inline R protect(R (*RCX_Nonnull func)(A), A arg) {
       int state = 0;
 
-      auto result = reinterpret_cast<R>(::rb_protect(
-          reinterpret_cast<VALUE (*)(VALUE)>(func), reinterpret_cast<VALUE>(arg), &state));
+      auto result =
+          reinterpret_cast<R>(::rb_protect(reinterpret_cast<VALUE (*RCX_Nonnull)(VALUE)>(func),
+              reinterpret_cast<VALUE>(arg), &state));
       check_jump_tag(state);
       return result;
     }
@@ -169,11 +171,12 @@ namespace rcx {
      * Assumes the (C) function doesn't throw C++ exceptions.
      */
     template <typename R, typename... A>
-    auto assume_noexcept(R (*f)(A...)) noexcept -> R (*)(A...) noexcept {
+    auto assume_noexcept(R (*RCX_Nonnull f)(A...)) noexcept -> R (*RCX_Nonnull)(A...) noexcept {
       return reinterpret_cast<R (*)(A...) noexcept>(f);
     }
     template <typename R, typename... A>
-    auto assume_noexcept(R (*f)(A..., ...)) noexcept -> R (*)(A..., ...) noexcept {
+    auto assume_noexcept(R (*RCX_Nonnull f)(A..., ...)) noexcept
+        -> R (*RCX_Nonnull)(A..., ...) noexcept {
       return reinterpret_cast<R (*)(A..., ...) noexcept>(f);
     }
 
@@ -300,23 +303,23 @@ namespace rcx {
   }
 
   namespace typed_data {
-    template <typename T> void dmark(gc::Marking, T *) noexcept {
+    template <typename T> void dmark(gc::Marking, T *RCX_Nonnull) noexcept {
       // noop
     }
-    template <typename T> void dfree(T *p) noexcept {
+    template <typename T> void dfree(T *RCX_Nonnull p) noexcept {
       delete p;
     }
-    template <typename T> size_t dsize(T const *) noexcept {
+    template <typename T> size_t dsize(T const *RCX_Nonnull) noexcept {
       return sizeof(T);
     }
-    template <typename T> void dcompact(gc::Compaction, T *) noexcept {
+    template <typename T> void dcompact(gc::Compaction, T *RCX_Nonnull) noexcept {
       // noop
     }
 
     template <typename T, typename S>
     inline ClassT<T> bind_data_type(ClassT<T> klass, ClassT<S> superclass) {
       if constexpr(std::derived_from<T, typed_data::WrappedStructBase>) {
-        rb_data_type_t const *parent = nullptr;
+        rb_data_type_t const *RCX_Nullable parent = nullptr;
         if constexpr(!std::derived_from<S, Value>) {
           parent = DataType<S>::get();
 
@@ -330,7 +333,7 @@ namespace rcx {
       return klass;
     }
 
-    template <typename T> inline rb_data_type_t const *DataTypeStorage<T>::get() {
+    template <typename T> inline rb_data_type_t const *RCX_Nonnull DataTypeStorage<T>::get() {
       if(!data_type_)
         throw std::runtime_error(
             std::format("Type '{}' is not yet bound to a Ruby Class", typeid(T).name()));
@@ -338,7 +341,8 @@ namespace rcx {
     }
 
     template <typename T>
-    inline void DataTypeStorage<T>::bind(ClassT<T> klass, rb_data_type_t const *parent) {
+    inline void DataTypeStorage<T>::bind(
+        ClassT<T> klass, rb_data_type_t const *RCX_Nullable parent) {
       if(data_type_) {
         throw std::runtime_error{"This type is already bound to a Ruby Class"};
       }
@@ -347,22 +351,22 @@ namespace rcx {
         .wrap_struct_name = strdup(klass.name().data()),  // let it leek
         .function = {
           .dmark =
-              [](void *p) {
+              [](void *RCX_Nonnull p) {
                 using typed_data::dmark;
                 dmark(gc::Marking(), static_cast<T *>(p));
               },
           .dfree =
-              [](void *p) {
+              [](void *RCX_Nonnull p) {
                 using typed_data::dfree;
                 dfree(static_cast<T *>(p));
               },
           .dsize =
-              [](void const *p) {
+              [](void const *RCX_Nonnull p) {
                 using typed_data::dsize;
                 return dsize(static_cast<T const *>(p));
               },
           .dcompact =
-              [](void *p) {
+              [](void *RCX_Nonnull p) {
                 using typed_data::dcompact;
                 dcompact(gc::Compaction(), static_cast<T *>(p));
               },
@@ -379,14 +383,14 @@ namespace rcx {
     }
 
     template <std::derived_from<TwoWayAssociation> T>
-    inline void dmark(gc::Marking gc, T *p) noexcept {
+    inline void dmark(gc::Marking gc, T *RCX_Nonnull p) noexcept {
       if(auto v = p->get_associated_value()) {
         gc.mark_movable(*v);
       }
     }
 
     template <std::derived_from<TwoWayAssociation> T>
-    inline void dcompact(gc::Compaction gc, T *p) noexcept {
+    inline void dcompact(gc::Compaction gc, T *RCX_Nonnull p) noexcept {
       p->replace_associated_value([gc](Value v) noexcept { return gc.new_location(v); });
     }
   }
@@ -714,7 +718,8 @@ namespace rcx {
       }));
     }
 
-    template <concepts::CharLike CharT> inline String String::intern_from(CharT const *s) {
+    template <concepts::CharLike CharT>
+    inline String String::intern_from(CharT const *RCX_Nonnull s) {
       return intern_from(std::basic_string_view<CharT>(s));
     }
 
@@ -728,7 +733,8 @@ namespace rcx {
       }));
     }
 
-    template <concepts::CharLike CharT> inline String String::copy_from(CharT const *s) {
+    template <concepts::CharLike CharT>
+    inline String String::copy_from(CharT const *RCX_Nonnull s) {
       return copy_from(std::basic_string_view<CharT>(s));
     }
 
@@ -736,12 +742,12 @@ namespace rcx {
       return RSTRING_LEN(as_VALUE());
     }
 
-    inline char *String::data() const {
+    inline char *RCX_Nonnull String::data() const {
       detail::protect([&] { ::rb_check_frozen(as_VALUE()); });
       return RSTRING_PTR(as_VALUE());
     }
 
-    inline char const *String::cdata() const noexcept {
+    inline char const *RCX_Nonnull String::cdata() const noexcept {
       return RSTRING_PTR(as_VALUE());
     }
 
@@ -933,7 +939,8 @@ namespace rcx {
       return {};
     }
 
-    inline Value make_ruby_exception(std::exception const *exc, std::type_info const *ti) {
+    inline Value make_ruby_exception(
+        std::exception const *RCX_Nullable exc, std::type_info const *RCX_Nullable ti) {
       std::string name, msg;
       if(ti)
         name = demangle_type_info(*ti);

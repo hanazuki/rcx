@@ -25,7 +25,7 @@ struct Test {
   static Value test_pinning(Value self);
 };
 
-class Base : public WrappedStruct<> {
+class Base: public WrappedStruct<> {
   std::string string_;
   int integer_;
 
@@ -39,13 +39,13 @@ public:
   void ruby_exception(Value e) const;
 };
 
-class Derived : public Base {
+class Derived: public Base {
 public:
   Derived(String string);
   String virtual_1() const override;
 };
 
-class Associated : public WrappedStruct<TwoWayAssociation> {
+class Associated: public WrappedStruct<TwoWayAssociation> {
 public:
   Associated &return_self();
 };
