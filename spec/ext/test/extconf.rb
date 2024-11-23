@@ -1,6 +1,7 @@
+require 'mkmf'
+$CXXFLAGS << ' --std=c++20'
 require 'rcx/mkmf'
 
-$CXXFLAGS << ' --std=c++20'
 $CXXFLAGS << ' -Werror=return-type'
 $CXXFLAGS << ' -g3'
 

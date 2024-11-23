@@ -75,23 +75,20 @@ namespace rcx {
 
     template <typename T> inline constexpr bool always_false_v = false;
 
-    template <typename CharT, size_t N> struct basic_cxstring;
-    template <size_t N> using cxstring = basic_cxstring<char, N>;
-    template <size_t N> using u8cxstring = basic_cxstring<char8_t, N>;
-    template <typename CharT, size_t N>
-    struct [[using clang: preferred_name(cxstring<N>),
-        preferred_name(u8cxstring<N>)]] basic_cxstring {
-      using value_type = CharT;
-      using traits_type = std::char_traits<CharT>;
+    // Duplicated definition for cxstring and u8cxstring, because clang-18 does not
+    // support template parameter deduction for type aliases.
+    template <size_t N> struct cxstring {
+      using value_type = char;
+      using traits_type = std::char_traits<value_type>;
 
-      std::array<CharT, N> data_;
+      std::array<value_type, N> data_;
 
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-      consteval basic_cxstring(CharT const (&str)[N]) {
+      consteval cxstring(value_type const (&str)[N]) {
         std::copy_n(str, N, data_.data());
       }
 
-      constexpr CharT const *data() const {
+      constexpr value_type const *data() const {
         return data_.data();
       }
 
@@ -99,7 +96,31 @@ namespace rcx {
         return N - 1;
       }
 
-      constexpr operator std::basic_string_view<CharT>() const {
+      constexpr operator std::basic_string_view<value_type>() const {
+        return {data(), size()};
+      }
+    };
+
+    template <size_t N> struct u8cxstring {
+      using value_type = char8_t;
+      using traits_type = std::char_traits<value_type>;
+
+      std::array<value_type, N> data_;
+
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+      consteval u8cxstring(value_type const (&str)[N]) {
+        std::copy_n(str, N, data_.data());
+      }
+
+      constexpr value_type const *data() const {
+        return data_.data();
+      }
+
+      constexpr size_t size() const {
+        return N - 1;
+      }
+
+      constexpr operator std::basic_string_view<value_type>() const {
         return {data(), size()};
       }
     };
@@ -138,7 +159,7 @@ namespace rcx {
       static_assert(detail::always_false_v<T>, "conversion into Value not defined");
     };
 
-#define RCX_DECLARE_CONV(TYPE)                                                                \
+#define RCX_DECLARE_CONV(TYPE)                                                                     \
   template <> struct FromValue<TYPE> {                                                             \
     TYPE convert(Value value);                                                                     \
   };                                                                                               \
@@ -527,12 +548,15 @@ namespace rcx {
       Value operator[](size_t i) const;
 
       template <std::ranges::contiguous_range R>
+#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
         requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
+#else
+        requires(std::derived_from<std::ranges::range_value_t<R>, ValueBase> &&
+                 sizeof(std::ranges::range_value_t<R>) == sizeof(ValueBase))
+#endif
       static Array new_from(R const &elements);
 
-      template <typename T>
-        requires std::is_layout_compatible_v<T, ValueBase>
-      static Array new_from(std::initializer_list<T> elements);
+      static Array new_from(std::initializer_list<ValueBase> elements);
 
       template <std::derived_from<ValueBase>... T>
       static Array new_from(std::tuple<T...> const &elements);
@@ -688,13 +712,6 @@ namespace rcx {
   };
 
   namespace detail {
-    template <concepts::ArgSpec... ArgSpec> struct Parser {
-      std::span<Value> args;
-      Value self;
-
-      decltype(auto) parse(Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func);
-    };
-
     inline Ruby &unsafe_ruby() {
       static Ruby ruby = {};
       return ruby;

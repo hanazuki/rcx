@@ -13,8 +13,8 @@
 #include <typeinfo>
 #include <utility>
 
-#include <rcx/internal/rcx.hpp>
 #include <ffi.h>
+#include <rcx/internal/rcx.hpp>
 
 #if HAVE_CXXABI_H
 #include <cxxabi.h>
@@ -77,6 +77,19 @@ namespace rcx {
       return reinterpret_cast<NativeRbFunc *>(callback);
     }
 
+    template <concepts::ArgSpec... ArgSpec> struct Parser {
+      std::span<Value> args;
+      Value self;
+
+      auto parse(Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func)
+          -> std::invoke_result_t<decltype(func), typename ArgSpec::ResultType...> {
+        // Experssions in an initializer list is evaluated from left to right, in contrast to
+        // function arguments.
+        return std::apply(std::forward<decltype(func)>(func),
+            std::tuple<typename ArgSpec::ResultType...>{ArgSpec::parse(ruby, self, args)...});
+      }
+    };
+
     template <typename... ArgSpec> struct method_callback {
       template <typename F> static NativeRbFunc *alloc(F &&function) {
         return alloc_callback([function](std::span<Value> args, Value self) -> Value {
@@ -91,15 +104,6 @@ namespace rcx {
         });
       }
     };
-
-    template <concepts::ArgSpec... ArgSpec>
-    decltype(auto) Parser<ArgSpec...>::parse(
-        Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func) {
-      // Experssions in an initializer list is evaluated from left to right, in contrast to
-      // function arguments.
-      return std::apply(std::forward<decltype(func)>(func),
-          std::tuple<typename ArgSpec::ResultType...>{ArgSpec::parse(ruby, self, args)...});
-    }
 
     inline void check_jump_tag(int state) {
       enum {
@@ -254,7 +258,7 @@ namespace rcx {
       return detail::unsafe_coerce<Value>(value ? RUBY_Qtrue : RUBY_Qfalse);
     };
 
-#define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                         \
+#define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                              \
   inline TYPE FromValue<TYPE>::convert(Value value) {                                              \
     return detail::protect([v = value.as_VALUE()] { return FROM_VALUE(v); });                      \
   }                                                                                                \
@@ -753,7 +757,7 @@ namespace rcx {
     return detail::unsafe_coerce<String>(value.as_VALUE());
   }
   inline std::string_view convert::FromValue<std::string_view>::convert(Value value) {
-    return {from_Value<String>(value)};
+    return std::string_view(from_Value<String>(value));
   }
 
   /// Pinned
@@ -814,7 +818,12 @@ namespace rcx {
     }
 
     template <std::ranges::contiguous_range R>
+#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
       requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
+#else
+      requires(std::derived_from<std::ranges::range_value_t<R>, ValueBase> &&
+               sizeof(std::ranges::range_value_t<R>) == sizeof(ValueBase))
+#endif
     inline Array Array::new_from(R const &elements) {
       // contiguous_range<T> has a layout combatible to VALUE[]
       return detail::unsafe_coerce<Array>(detail::protect([&] {
@@ -823,10 +832,11 @@ namespace rcx {
       }));
     };
 
-    template <typename T>
-      requires std::is_layout_compatible_v<T, ValueBase>
-    static Array new_from(std::initializer_list<T> elements) {
-      return new_from(std::span(elements));
+    static Array new_from(std::initializer_list<ValueBase> elements) {
+      return detail::unsafe_coerce<Array>(detail::protect([&] {
+        return ::rb_ary_new_from_values(
+            elements.size(), reinterpret_cast<VALUE const *>(elements.begin()));
+      }));
     }
 
     template <std::derived_from<ValueBase>... T>
