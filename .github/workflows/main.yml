@@ -38,9 +38,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Ruby
         run: |
+          pushd "$(mktemp -d)"
+          oras manifest fetch-config "$TAG" | tee config.json
+
+          PREFIX=$(jq -r '.install_prefix' <config.json)
           mkdir -p "$PREFIX"
 
-          pushd /tmp
           oras pull "$TAG"
           tar xf ruby.tar.zst -C "$PREFIX"
           popd
@@ -48,7 +51,6 @@ jobs:
           echo "$PREFIX/bin" >>"$GITHUB_PATH"
         env:
           TAG: ${{ matrix.artifact_tag }}
-          PREFIX: ${{ matrix.install_prefix }}
       - name: Show environment
         run: |
           bundle env
