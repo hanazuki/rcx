@@ -75,23 +75,20 @@ namespace rcx {
 
     template <typename T> inline constexpr bool always_false_v = false;
 
-    template <typename CharT, size_t N> struct basic_cxstring;
-    template <size_t N> using cxstring = basic_cxstring<char, N>;
-    template <size_t N> using u8cxstring = basic_cxstring<char8_t, N>;
-    template <typename CharT, size_t N>
-    struct [[using clang: preferred_name(cxstring<N>),
-        preferred_name(u8cxstring<N>)]] basic_cxstring {
-      using value_type = CharT;
-      using traits_type = std::char_traits<CharT>;
+    // Duplicated definition for cxstring and u8cxstring, because clang-18 does not
+    // support template parameter deduction for type aliases.
+    template <size_t N> struct cxstring {
+      using value_type = char;
+      using traits_type = std::char_traits<value_type>;
 
-      std::array<CharT, N> data_;
+      std::array<value_type, N> data_;
 
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-      consteval basic_cxstring(CharT const (&str)[N]) {
+      consteval cxstring(value_type const (&str)[N]) {
         std::copy_n(str, N, data_.data());
       }
 
-      constexpr CharT const *data() const {
+      constexpr value_type const *data() const {
         return data_.data();
       }
 
@@ -99,7 +96,31 @@ namespace rcx {
         return N - 1;
       }
 
-      constexpr operator std::basic_string_view<CharT>() const {
+      constexpr operator std::basic_string_view<value_type>() const {
+        return {data(), size()};
+      }
+    };
+
+    template <size_t N> struct u8cxstring {
+      using value_type = char8_t;
+      using traits_type = std::char_traits<value_type>;
+
+      std::array<value_type, N> data_;
+
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+      consteval u8cxstring(value_type const (&str)[N]) {
+        std::copy_n(str, N, data_.data());
+      }
+
+      constexpr value_type const *data() const {
+        return data_.data();
+      }
+
+      constexpr size_t size() const {
+        return N - 1;
+      }
+
+      constexpr operator std::basic_string_view<value_type>() const {
         return {data(), size()};
       }
     };
