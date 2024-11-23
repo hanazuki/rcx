@@ -753,7 +753,7 @@ namespace rcx {
     return detail::unsafe_coerce<String>(value.as_VALUE());
   }
   inline std::string_view convert::FromValue<std::string_view>::convert(Value value) {
-    return {from_Value<String>(value)};
+    return std::string_view(from_Value<String>(value));
   }
 
   /// Pinned
