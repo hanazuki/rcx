@@ -712,13 +712,6 @@ namespace rcx {
   };
 
   namespace detail {
-    template <concepts::ArgSpec... ArgSpec> struct Parser {
-      std::span<Value> args;
-      Value self;
-
-      decltype(auto) parse(Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func);
-    };
-
     inline Ruby &unsafe_ruby() {
       static Ruby ruby = {};
       return ruby;

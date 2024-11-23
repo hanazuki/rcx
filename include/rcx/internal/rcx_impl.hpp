@@ -77,6 +77,19 @@ namespace rcx {
       return reinterpret_cast<NativeRbFunc *>(callback);
     }
 
+    template <concepts::ArgSpec... ArgSpec> struct Parser {
+      std::span<Value> args;
+      Value self;
+
+      auto parse(Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func)
+          -> std::invoke_result_t<decltype(func), typename ArgSpec::ResultType...> {
+        // Experssions in an initializer list is evaluated from left to right, in contrast to
+        // function arguments.
+        return std::apply(std::forward<decltype(func)>(func),
+            std::tuple<typename ArgSpec::ResultType...>{ArgSpec::parse(ruby, self, args)...});
+      }
+    };
+
     template <typename... ArgSpec> struct method_callback {
       template <typename F> static NativeRbFunc *alloc(F &&function) {
         return alloc_callback([function](std::span<Value> args, Value self) -> Value {
@@ -91,15 +104,6 @@ namespace rcx {
         });
       }
     };
-
-    template <concepts::ArgSpec... ArgSpec>
-    decltype(auto) Parser<ArgSpec...>::parse(
-        Ruby &ruby, std::invocable<typename ArgSpec::ResultType...> auto &&func) {
-      // Experssions in an initializer list is evaluated from left to right, in contrast to
-      // function arguments.
-      return std::apply(std::forward<decltype(func)>(func),
-          std::tuple<typename ArgSpec::ResultType...>{ArgSpec::parse(ruby, self, args)...});
-    }
 
     inline void check_jump_tag(int state) {
       enum {
