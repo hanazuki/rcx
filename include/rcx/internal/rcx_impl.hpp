@@ -813,9 +813,13 @@ namespace rcx {
       ;
     }
 
-#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
     template <std::ranges::contiguous_range R>
+#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
       requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
+#else
+      requires(std::derived_from<std::ranges::range_value_t<R>, ValueBase> &&
+               sizeof(std::ranges::range_value_t<R>) == sizeof(ValueBase))
+#endif
     inline Array Array::new_from(R const &elements) {
       // contiguous_range<T> has a layout combatible to VALUE[]
       return detail::unsafe_coerce<Array>(detail::protect([&] {
@@ -823,7 +827,6 @@ namespace rcx {
             elements.size(), reinterpret_cast<VALUE const *>(elements.data()));
       }));
     };
-#endif
 
     static Array new_from(std::initializer_list<ValueBase> elements) {
       return detail::unsafe_coerce<Array>(detail::protect([&] {

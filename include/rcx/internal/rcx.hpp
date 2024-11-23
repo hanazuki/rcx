@@ -547,11 +547,14 @@ namespace rcx {
       template <concepts::ConvertibleFromValue T = Value> decltype(auto) at(size_t i) const;
       Value operator[](size_t i) const;
 
-#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
       template <std::ranges::contiguous_range R>
+#ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
         requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
-      static Array new_from(R const &elements);
+#else
+        requires(std::derived_from<std::ranges::range_value_t<R>, ValueBase> &&
+                 sizeof(std::ranges::range_value_t<R>) == sizeof(ValueBase))
 #endif
+      static Array new_from(R const &elements);
 
       static Array new_from(std::initializer_list<ValueBase> elements);
 
