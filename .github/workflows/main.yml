@@ -22,12 +22,12 @@ jobs:
 
   build:
     needs: matrix
-    runs-on: ubuntu-24.04
-    name: ruby-${{ matrix.ruby }} ${{ matrix.compilers.cxx }}
     strategy:
       fail-fast: false
       matrix:
         include: ${{fromJson(needs.matrix.outputs.json)}}
+    runs-on: ${{ matrix.runner }}
+    name: ruby-${{ matrix.ruby }} ${{ matrix.runner }} ${{ matrix.compilers.cxx }}
     steps:
       - uses: actions/checkout@v4
       - uses: oras-project/setup-oras@v1
@@ -38,9 +38,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Ruby
         run: |
+          pushd "$(mktemp -d)"
+          oras manifest fetch-config "$TAG" | tee config.json
+
+          PREFIX=$(jq -r '.install_prefix' <config.json)
           mkdir -p "$PREFIX"
 
-          pushd /tmp
           oras pull "$TAG"
           tar xf ruby.tar.zst -C "$PREFIX"
           popd
@@ -48,7 +51,6 @@ jobs:
           echo "$PREFIX/bin" >>"$GITHUB_PATH"
         env:
           TAG: ${{ matrix.artifact_tag }}
-          PREFIX: ${{ matrix.install_prefix }}
       - name: Show environment
         run: |
           bundle env
