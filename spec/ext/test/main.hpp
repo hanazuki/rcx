@@ -31,6 +31,7 @@ class Base: public WrappedStruct<> {
 
 public:
   Base(String string);
+  void callback(Value callable) const;
   String string() const;
   void set_string(std::string_view s);
   virtual String virtual_1() const;

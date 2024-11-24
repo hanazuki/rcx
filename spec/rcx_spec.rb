@@ -86,24 +86,33 @@ RSpec.describe 'test ext' do
       end
     end
 
-    specify 'C++ exception' do
+    specify 'throw C++ exception' do
       obj = Base.new('hello')
       expect { obj.cxx_exception }.to raise_error(RuntimeError, 'std::out_of_range: pui')
     end
 
-    specify 'Unknown C++ exception' do
+    specify 'throw Unknown C++ exception' do
       obj = Base.new('hello')
       expect { obj.cxx_exception_unknown }.to raise_error(RuntimeError, /\Aint/)
     end
 
-    specify 'Ruby exception' do
+    specify 'throw RubyError' do
       obj = Base.new('hello')
       expect { obj.ruby_exception(RangeError.new('pui')) }.to raise_error(RangeError, 'pui')
     end
 
-    specify 'Ruby format' do
+    specify 'throw RubyError::format' do
       obj = Base.new('hello')
       expect { obj.ruby_exception_format(RangeError, 'pui') }.to raise_error(RangeError, 'format pui')
+    end
+
+    specify 'exception ruby->c++->ruby' do
+      exc = RangeError.new('pui')
+
+      obj = Base.new('hello')
+      expect { obj.callback(-> { raise exc }) }.to raise_error {|e|
+        expect(e).to eq exc
+      }
     end
   end
 end

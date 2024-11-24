@@ -214,6 +214,10 @@ Value Test::test_pinning([[maybe_unused]] Value self) {
 Base::Base(String string): string_(std::string_view(string)) {
 }
 
+void Base::callback(Value callable) const {
+  callable.send("call"_id);
+}
+
 String Base::string() const {
   return String::copy_from(string_);
 }
@@ -270,6 +274,7 @@ extern "C" void Init_test() {
 
   auto cBase = ruby.define_class<Base>("Base")
                    .define_constructor(arg<String, "string">)
+                   .define_method_const("callback", &Base::callback, arg<Value, "callable">)
                    .define_method_const("string", &Base::string)
                    .define_method("string=", &Base::set_string, arg<std::string_view>)
                    .define_method_const("virtual_1", &Base::virtual_1)
