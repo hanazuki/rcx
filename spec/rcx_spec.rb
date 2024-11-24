@@ -100,5 +100,10 @@ RSpec.describe 'test ext' do
       obj = Base.new('hello')
       expect { obj.ruby_exception(RangeError.new('pui')) }.to raise_error(RangeError, 'pui')
     end
+
+    specify 'Ruby format' do
+      obj = Base.new('hello')
+      expect { obj.ruby_exception_format(RangeError, 'pui') }.to raise_error(RangeError, 'format pui')
+    end
   end
 end

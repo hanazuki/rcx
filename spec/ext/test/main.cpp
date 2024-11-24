@@ -232,7 +232,11 @@ void Base::cxx_exception_unknown() const {
 }
 
 void Base::ruby_exception(Value e) const {
-  ::rb_exc_raise(e.as_VALUE());
+  throw rcx::RubyError(e);
+}
+
+void Base::ruby_exception_format(Class e, String s) const {
+  throw rcx::RubyError::format(e, "format {}", std::string_view(s));
 }
 
 Derived::Derived(String string): Base(string) {
@@ -268,7 +272,9 @@ extern "C" void Init_test() {
                    .define_method_const("virtual_1", &Base::virtual_1)
                    .define_method_const("cxx_exception", &Base::cxx_exception)
                    .define_method_const("cxx_exception_unknown", &Base::cxx_exception_unknown)
-                   .define_method_const("ruby_exception", &Base::ruby_exception, arg<Value>);
+                   .define_method_const("ruby_exception", &Base::ruby_exception, arg<Value>)
+                   .define_method_const("ruby_exception_format", &Base::ruby_exception_format,
+                       arg<Class>, arg<String>);
   [[maybe_unused]]
   auto cDerived =
       ruby.define_class<Derived>("Derived", cBase).define_constructor(arg<String, "string">);

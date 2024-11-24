@@ -37,6 +37,7 @@ public:
   void cxx_exception() const;
   void cxx_exception_unknown() const;
   void ruby_exception(Value e) const;
+  void ruby_exception_format(Class e, String s) const;
 };
 
 class Derived: public Base {

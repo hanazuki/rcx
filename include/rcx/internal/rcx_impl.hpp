@@ -927,6 +927,19 @@ namespace rcx {
     return define_class<T>(std::forward<decltype(name)>(name), builtin::Object());
   }
 
+  inline RubyError::RubyError(Value exception) noexcept: exception_(exception) {
+  }
+
+  inline Value RubyError::exception() const noexcept {
+    return exception_;
+  }
+
+  template <typename... Args>
+  inline RubyError RubyError::format(Class cls, std::format_string<Args...> fmt, Args &&...args) {
+    auto const msg = std::format(fmt, std::forward<Args>(args)...);
+    return RubyError{cls.new_instance(String::intern_from(msg))};
+  }
+
   namespace detail {
     inline std::string demangle_type_info(std::type_info const &ti) {
       if constexpr(have_abi_cxa_demangle) {
@@ -957,7 +970,7 @@ namespace rcx {
       } catch(Jump const &jump) {
         ::rb_jump_tag(jump.state);
       } catch(RubyError const &exc) {
-        ::rb_exc_raise(exc.err().as_VALUE());
+        ::rb_exc_raise(exc.exception().as_VALUE());
       } catch(std::exception const &exc) {
         ::rb_exc_raise(make_ruby_exception(&exc, &typeid(exc)).as_VALUE());
       } catch(...) {

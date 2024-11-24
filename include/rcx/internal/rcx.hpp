@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <concepts>
+#include <format>
 #include <functional>
 #include <initializer_list>
 #include <memory>
@@ -701,15 +702,15 @@ namespace rcx {
   };
 
   class RubyError {
-    Value err_;
+    Value exception_;
 
   public:
-    RubyError(Value err): err_(err) {
-    }
+    explicit RubyError(Value exception) noexcept;
 
-    Value err() const {
-      return err_;
-    }
+    Value exception() const noexcept;
+
+    template <typename... Args>
+    static RubyError format(Class cls, std::format_string<Args...> fmt, Args &&...args);
   };
 
   namespace detail {
