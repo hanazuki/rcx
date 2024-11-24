@@ -1,0 +1,6 @@
+{
+  "packageManager": "yarn@4.6.0",
+  "dependencies": {
+    "@jothepro/doxygen-awesome-css": "https://github.com/jothepro/doxygen-awesome-css#v2.3.4"
+  }
+}

@@ -352,11 +352,9 @@ namespace rcx {
     template <detail::u8cxstring> Id operator""_id();
   }
 
-  /**
-   * Wrapper for static IDs.
-   *
-   * Static IDs are never garbage-collected and safe to store in the heap.
-   */
+  /// Wrapper for static IDs.
+  ///
+  /// Static IDs are never garbage-collected and safe to store in the heap.
   class Id {
     ID id_;
 
