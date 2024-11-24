@@ -261,6 +261,32 @@ namespace rcx {
       return detail::unsafe_coerce<Value>(value ? RUBY_Qtrue : RUBY_Qfalse);
     };
 
+    inline signed char FromValue<signed char>::convert(Value value) {
+      int const v = NUM2INT(value.as_VALUE());
+      signed char const r = static_cast<signed char>(v);
+      if(v != static_cast<int>(r)) {
+        throw RubyError::format(builtin::RangeError(),
+            "integer {} too {} to convert to 'signed char'", v, v < 0 ? "small" : "big");
+      }
+      return r;
+    }
+    inline Value IntoValue<signed char>::convert(signed char value) {
+      return detail::unsafe_coerce<Value>(INT2FIX(value));
+    };
+
+    inline unsigned char FromValue<unsigned char>::convert(Value value) {
+      int const v = NUM2INT(value.as_VALUE());
+      unsigned char const r = static_cast<unsigned char>(v);
+      if(v != static_cast<int>(r)) {
+        throw RubyError::format(builtin::RangeError(),
+            "integer {} too {} to convert to 'unsigned char'", v, v < 0 ? "small" : "big");
+      }
+      return r;
+    }
+    inline Value IntoValue<unsigned char>::convert(unsigned char value) {
+      return detail::unsafe_coerce<Value>(INT2FIX(value));
+    };
+
 #define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                              \
   inline TYPE FromValue<TYPE>::convert(Value value) {                                              \
     return detail::protect([v = value.as_VALUE()] { return FROM_VALUE(v); });                      \
@@ -443,6 +469,9 @@ namespace rcx {
     }
     inline value::Class RuntimeError() {
       return detail::unsafe_coerce<value::Class>(::rb_eRuntimeError);
+    }
+    inline value::Class RangeError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eRangeError);
     }
   }
 

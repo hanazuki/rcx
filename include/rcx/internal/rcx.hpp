@@ -169,6 +169,8 @@ namespace rcx {
   };
 
     RCX_DECLARE_CONV(bool);
+    RCX_DECLARE_CONV(signed char);
+    RCX_DECLARE_CONV(unsigned char);
     RCX_DECLARE_CONV(short);
     RCX_DECLARE_CONV(unsigned short);
     RCX_DECLARE_CONV(int);
@@ -290,6 +292,7 @@ namespace rcx {
     ClassT<value::String> String();
     ClassT<value::Array> Array();
     value::Class RuntimeError();
+    value::Class RangeError();
   };
 
   namespace literals {

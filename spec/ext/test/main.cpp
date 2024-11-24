@@ -31,6 +31,9 @@ Value Test::test_primitive(Value self) {
   roundtrip(true, "true");
   roundtrip(false, "false");
 
+  roundtrip(std::numeric_limits<signed char>::min());
+  roundtrip(std::numeric_limits<signed char>::max());
+  roundtrip(std::numeric_limits<unsigned char>::max());
   roundtrip(std::numeric_limits<short>::min());
   roundtrip(std::numeric_limits<short>::max());
   roundtrip(std::numeric_limits<unsigned short>::max());
