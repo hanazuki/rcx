@@ -79,10 +79,23 @@ RSpec.describe 'test ext' do
       end
     end
 
-    specify 'two-way assocication (GC)' do
-      arr = 20.times.map { Associated.new }
-      arr.each do |assoc|
-        expect(assoc.return_self).to eq assoc
+    describe 'two-way associatetion' do
+      specify 'GC safety' do
+        arr = 20.times.map { Associated.new }
+        arr.each do |assoc|
+          expect(assoc.return_self).to be assoc
+        end
+      end
+
+      specify 'clone' do
+        obj = Associated.new
+        expect(obj.return_self).to be obj
+
+        obj2 = obj.clone
+        expect(obj2.return_self).to be obj2
+
+        obj3 = obj.freeze.clone(freeze: false).clone
+        expect(obj3.return_self).to be obj3
       end
     end
 
@@ -111,7 +124,7 @@ RSpec.describe 'test ext' do
 
       obj = Base.new('hello')
       expect { obj.callback(-> { raise exc }) }.to raise_error {|e|
-        expect(e).to eq exc
+        expect(e).to be exc
       }
     end
 
@@ -123,6 +136,10 @@ RSpec.describe 'test ext' do
       obj.string = 'pui'
       expect(obj.string).to eq 'pui'
       expect(obj2.string).to eq 'hello'
+
+      obj3 = obj.freeze.clone(freeze: false)
+      obj3.string = 'obj3'
+      expect(obj3.string).to eq 'obj3'
     end
   end
 end

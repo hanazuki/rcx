@@ -304,5 +304,6 @@ extern "C" void Init_test() {
   [[maybe_unused]]
   auto cAssociated = ruby.define_class<Associated>("Associated")
                          .define_constructor()
+                         .define_copy_constructor()
                          .define_method("return_self", &Associated::return_self);
 }
