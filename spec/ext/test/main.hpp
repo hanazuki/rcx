@@ -23,6 +23,7 @@ struct Test {
   static Value test_singleton_method(Value self);
   static Value test_array(Value self);
   static Value test_pinning(Value self);
+  static Value test_allocate(Value self);
 };
 
 class Base: public WrappedStruct<> {

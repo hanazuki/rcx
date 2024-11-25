@@ -1,11 +1,4 @@
-#include <concepts>
-#include <cstring>
-#include <exception>
-#include <format>
-#include <functional>
-#include <memory>
 #include <ranges>
-#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -366,6 +359,10 @@ namespace rcx {
       return &*data_type_;
     }
 
+    template <typename T> inline ClassT<T> DataTypeStorage<T>::bound_class() {
+      return detail::unsafe_coerce<ClassT<T>>(reinterpret_cast<VALUE>(get()->data));
+    }
+
     template <typename T>
     inline void DataTypeStorage<T>::bind(
         ClassT<T> klass, rb_data_type_t const *RCX_Nullable parent) {
@@ -406,6 +403,18 @@ namespace rcx {
 
       ::rb_define_alloc_func(klass.as_VALUE(),
           [](VALUE klass) { return ::rb_data_typed_object_wrap(klass, nullptr, get()); });
+    }
+
+    template <typename T>
+    template <typename... A>
+      requires std::constructible_from<T, A...>
+    inline Value DataTypeStorage<T>::initialize(Value value, A &&...args) {
+      auto data = new T(std::forward<A>(args)...);
+      RTYPEDDATA_DATA(value.as_VALUE()) = data;  // Tracked by Ruby GC
+      if constexpr(std::derived_from<T, typed_data::TwoWayAssociation>) {
+        data->associate_value(value);
+      }
+      return Value::qnil;
     }
 
     template <std::derived_from<TwoWayAssociation> T>
@@ -643,6 +652,10 @@ namespace rcx {
           [&] { return ::rb_class_new_instance(vargs.size(), vargs.data(), this->as_VALUE()); }));
     }
 
+    template <typename T> inline Value ClassT<T>::allocate() const {
+      return detail::unsafe_coerce<Value>(detail::protect(::rb_obj_alloc, this->as_VALUE()));
+    }
+
     template <typename T>
     template <concepts::ArgSpec... ArgSpec>
     inline ClassT<T> ClassT<T>::define_method(concepts::Identifier auto &&mid,
@@ -674,16 +687,8 @@ namespace rcx {
     template <concepts::ArgSpec... ArgSpec>
       requires std::constructible_from<T, typename ArgSpec::ResultType...>
     inline ClassT<T> ClassT<T>::define_constructor(ArgSpec...) const {
-      auto const factory = []<typename... A>(Value self, A &&...args) -> Value {
-        auto data = new T(std::forward<A>(args)...);
-        RTYPEDDATA_DATA(self.as_VALUE()) = data;  // Tracked by Ruby GC
-        if constexpr(std::derived_from<T, typed_data::TwoWayAssociation>) {
-          data->associate_value(self);
-        }
-        return Value::qnil;
-      };
-
-      auto const callback = detail::method_callback<arg::Self<Value>, ArgSpec...>::alloc(factory);
+      auto const callback = detail::method_callback<arg::Self<Value>, ArgSpec...>::alloc(
+          typed_data::DataType<T>::template initialize<typename ArgSpec::ResultType...>);
       detail::protect([&] {
         using namespace literals;
         rb_define_method_id(this->as_VALUE(), detail::into_ID("initialize"_id), callback, -1);

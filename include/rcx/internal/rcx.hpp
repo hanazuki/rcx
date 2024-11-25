@@ -495,6 +495,13 @@ namespace rcx {
 
       auto new_instance(concepts::ConvertibleIntoValue auto &&...args) const -> auto;
 
+      /**
+       * Allocates an uninitialized instance of this class.
+       *
+       * @returns Uninitialized object. This object should be initialized before use.
+       */
+      Value allocate() const;
+
       template <concepts::ArgSpec... ArgSpec>
       ClassT<T> define_method(concepts::Identifier auto &&mid,
           std::invocable<T &, typename ArgSpec::ResultType...> auto &&function,
@@ -660,7 +667,14 @@ namespace rcx {
 
     public:
       static void bind(ClassT<T> klass, rb_data_type_t const *RCX_Nullable parent = nullptr);
+      static ClassT<T> bound_class();
       static rb_data_type_t const *RCX_Nonnull get();
+
+      template <typename... A>
+        requires std::constructible_from<T, A...>
+      static Value initialize(Value value, A &&...args);
+
+      // TODO: allocator support
     };
 
     template <typename T> using DataType = DataTypeStorage<std::remove_cvref_t<T>>;
