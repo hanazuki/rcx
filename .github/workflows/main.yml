@@ -28,6 +28,7 @@ jobs:
         include: ${{fromJson(needs.matrix.outputs.json)}}
     runs-on: ${{ matrix.runner }}
     name: ruby-${{ matrix.ruby }} ${{ matrix.runner }} ${{ matrix.compilers.cxx }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: oras-project/setup-oras@v1
