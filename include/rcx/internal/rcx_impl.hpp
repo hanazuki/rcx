@@ -1,3 +1,4 @@
+#include <concepts>
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
@@ -307,7 +308,7 @@ namespace rcx {
       }
       auto const data = rb_check_typeddata(value.as_VALUE(), typed_data::DataType<T>::get());
       if(!data) {
-        throw std::runtime_error{"Object is not initialized yet"};
+        throw std::runtime_error{"Object is not yet initialized"};
       }
       return std::ref(*static_cast<T *>(data));
     }
@@ -414,7 +415,19 @@ namespace rcx {
       if constexpr(std::derived_from<T, typed_data::TwoWayAssociation>) {
         data->associate_value(value);
       }
-      return Value::qnil;
+      return value;
+    }
+
+    template <typename T>
+    inline Value DataTypeStorage<T>::initialize_copy(Value value, T const &obj)
+      requires std::copy_constructible<T>
+    {
+      auto data = new T(obj);
+      RTYPEDDATA_DATA(value.as_VALUE()) = data;  // Tracked by Ruby GC
+      if constexpr(std::derived_from<T, typed_data::TwoWayAssociation>) {
+        data->associate_value(value);
+      }
+      return value;
     }
 
     template <std::derived_from<TwoWayAssociation> T>
@@ -692,6 +705,19 @@ namespace rcx {
       detail::protect([&] {
         using namespace literals;
         rb_define_method_id(this->as_VALUE(), detail::into_ID("initialize"_id), callback, -1);
+      });
+      return *this;
+    }
+
+    template <typename T>
+    inline ClassT<T> ClassT<T>::define_copy_constructor() const
+      requires std::copy_constructible<T>
+    {
+      auto const callback = detail::method_callback<arg::Self<Value>, arg::Arg<T const &>>::alloc(
+          typed_data::DataType<T>::initialize_copy);
+      detail::protect([&] {
+        using namespace literals;
+        rb_define_method_id(this->as_VALUE(), detail::into_ID("initialize_copy"_id), callback, -1);
       });
       return *this;
     }

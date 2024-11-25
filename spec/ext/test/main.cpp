@@ -286,6 +286,7 @@ extern "C" void Init_test() {
 
   cBase = rcx::PinnedOpt{ruby.define_class<Base>("Base")
         .define_constructor(arg<String, "string">)
+        .define_copy_constructor()
         .define_method_const("callback", &Base::callback, arg<Value, "callable">)
         .define_method_const("string", &Base::string)
         .define_method("string=", &Base::set_string, arg<std::string_view>)
@@ -296,8 +297,9 @@ extern "C" void Init_test() {
         .define_method_const(
             "ruby_exception_format", &Base::ruby_exception_format, arg<Class>, arg<String>)};
 
-  cDerived = rcx::PinnedOpt{
-    ruby.define_class<Derived>("Derived", *cBase).define_constructor(arg<String, "string">)};
+  cDerived = rcx::PinnedOpt{ruby.define_class<Derived>("Derived", *cBase)
+        .define_copy_constructor()
+        .define_constructor(arg<String, "string">)};
 
   [[maybe_unused]]
   auto cAssociated = ruby.define_class<Associated>("Associated")

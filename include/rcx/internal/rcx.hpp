@@ -516,6 +516,9 @@ namespace rcx {
         requires std::constructible_from<T, typename ArgSpec::ResultType...>
       ClassT<T> define_constructor(ArgSpec... argspec) const;
 
+      ClassT<T> define_copy_constructor() const
+        requires std::copy_constructible<T>;
+
       static Class new_class();
       template <typename S> static ClassT<S> new_class(ClassT<S> superclass);
     };
@@ -673,6 +676,9 @@ namespace rcx {
       template <typename... A>
         requires std::constructible_from<T, A...>
       static Value initialize(Value value, A &&...args);
+
+      static Value initialize_copy(Value value, T const &obj)
+        requires std::copy_constructible<T>;
 
       // TODO: allocator support
     };

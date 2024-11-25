@@ -114,5 +114,15 @@ RSpec.describe 'test ext' do
         expect(e).to eq exc
       }
     end
+
+    specify 'clone' do
+      obj = Base.new('hello')
+      obj2 = obj.clone
+      expect(obj2.string).to eq 'hello'
+
+      obj.string = 'pui'
+      expect(obj.string).to eq 'pui'
+      expect(obj2.string).to eq 'hello'
+    end
   end
 end
