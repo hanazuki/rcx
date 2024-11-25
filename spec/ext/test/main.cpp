@@ -11,8 +11,8 @@
 using namespace rcx::value;
 using namespace rcx::literals;
 
-static rcx::PinnedOpt<ClassT<Base>> cBase;
-static rcx::PinnedOpt<ClassT<Derived>> cDerived;
+static std::optional<ClassT<Base>> cBase;
+static std::optional<ClassT<Derived>> cDerived;
 
 Value Test::test_nil(Value self) {
   self.send("assert_nil", Value{});
@@ -284,22 +284,22 @@ extern "C" void Init_test() {
                    .define_method("test_pinning", &Test::test_pinning)
                    .define_method("test_allocate", &Test::test_allocate);
 
-  cBase = rcx::PinnedOpt{ruby.define_class<Base>("Base")
-        .define_constructor(arg<String, "string">)
-        .define_copy_constructor()
-        .define_method_const("callback", &Base::callback, arg<Value, "callable">)
-        .define_method_const("string", &Base::string)
-        .define_method("string=", &Base::set_string, arg<std::string_view>)
-        .define_method_const("virtual_1", &Base::virtual_1)
-        .define_method_const("cxx_exception", &Base::cxx_exception)
-        .define_method_const("cxx_exception_unknown", &Base::cxx_exception_unknown)
-        .define_method_const("ruby_exception", &Base::ruby_exception, arg<Value>)
-        .define_method_const(
-            "ruby_exception_format", &Base::ruby_exception_format, arg<Class>, arg<String>)};
+  cBase = ruby.define_class<Base>("Base")
+              .define_constructor(arg<String, "string">)
+              .define_copy_constructor()
+              .define_method_const("callback", &Base::callback, arg<Value, "callable">)
+              .define_method_const("string", &Base::string)
+              .define_method("string=", &Base::set_string, arg<std::string_view>)
+              .define_method_const("virtual_1", &Base::virtual_1)
+              .define_method_const("cxx_exception", &Base::cxx_exception)
+              .define_method_const("cxx_exception_unknown", &Base::cxx_exception_unknown)
+              .define_method_const("ruby_exception", &Base::ruby_exception, arg<Value>)
+              .define_method_const(
+                  "ruby_exception_format", &Base::ruby_exception_format, arg<Class>, arg<String>);
 
-  cDerived = rcx::PinnedOpt{ruby.define_class<Derived>("Derived", *cBase)
-        .define_copy_constructor()
-        .define_constructor(arg<String, "string">)};
+  cDerived = ruby.define_class<Derived>("Derived", *cBase)
+                 .define_copy_constructor()
+                 .define_constructor(arg<String, "string">);
 
   [[maybe_unused]]
   auto cAssociated = ruby.define_class<Associated>("Associated")
