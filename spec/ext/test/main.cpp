@@ -268,6 +268,11 @@ Associated &Associated::return_self() {
   return *this;
 }
 
+std::tuple<Associated const &, Associated const &> Associated::swap(
+    Value, std::tuple<Associated const &, Associated const &> arr) {
+  return {std::ref(std::get<1>(arr)), std::ref(std::get<0>(arr))};
+}
+
 extern "C" void Init_test() {
   using namespace rcx::arg;
 
@@ -305,5 +310,7 @@ extern "C" void Init_test() {
   auto cAssociated = ruby.define_class<Associated>("Associated")
                          .define_constructor()
                          .define_copy_constructor()
-                         .define_method("return_self", &Associated::return_self);
+                         .define_method("return_self", &Associated::return_self)
+                         .define_singleton_method("swap", &Associated::swap,
+                             arg<std::tuple<Associated const &, Associated const &>>);
 }

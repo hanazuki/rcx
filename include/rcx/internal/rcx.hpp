@@ -218,6 +218,16 @@ namespace rcx {
     };
   }
 
+  namespace convert {
+    template <concepts::ConvertibleFromValue... T> struct FromValue<std::tuple<T...>> {
+      decltype(auto) convert(Value value);
+    };
+
+    template <concepts::ConvertibleIntoValue... T> struct IntoValue<std::tuple<T...>> {
+      Value convert(std::tuple<T...> value);
+    };
+  }
+
   namespace arg {
     template <concepts::ConvertibleFromValue T = Value> struct Self {
       using ResultType = detail::wrap_ref_t<T>;
@@ -293,6 +303,7 @@ namespace rcx {
     ClassT<value::Array> Array();
     value::Class RuntimeError();
     value::Class RangeError();
+    value::Class ArgumentError();
   };
 
   namespace literals {

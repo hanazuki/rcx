@@ -97,6 +97,12 @@ RSpec.describe 'test ext' do
         obj3 = obj.freeze.clone(freeze: false).clone
         expect(obj3.return_self).to be obj3
       end
+
+      specify 'tuple' do
+        arr = [Associated.new, Associated.new]
+
+        expect(Associated.swap(arr)).to contain_exactly(be(arr[1]), be(arr[0]))
+      end
     end
 
     specify 'throw C++ exception' do

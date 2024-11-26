@@ -237,7 +237,7 @@ namespace rcx {
       if constexpr(std::convertible_to<T, Value>) {
         return value;
       } else {
-        return IntoValue<std::remove_reference_t<T>>().convert(std::forward<T>(value));
+        return IntoValue<std::remove_reference_t<T>>().convert(value);
       }
     }
     template <typename T> inline auto from_Value(Value value) -> auto {
@@ -494,6 +494,9 @@ namespace rcx {
     }
     inline value::Class RangeError() {
       return detail::unsafe_coerce<value::Class>(::rb_eRangeError);
+    }
+    inline value::Class ArgumentError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eArgError);
     }
   }
 
@@ -898,7 +901,7 @@ namespace rcx {
       }));
     };
 
-    static Array new_from(std::initializer_list<ValueBase> elements) {
+    inline Array Array::new_from(std::initializer_list<ValueBase> elements) {
       return detail::unsafe_coerce<Array>(detail::protect([&] {
         return ::rb_ary_new_from_values(
             elements.size(), reinterpret_cast<VALUE const *>(elements.begin()));
@@ -906,7 +909,7 @@ namespace rcx {
     }
 
     template <std::derived_from<ValueBase>... T>
-    inline Array new_from(std::tuple<T...> const &elements) {
+    inline Array Array::new_from(std::tuple<T...> const &elements) {
       return detail::unsafe_coerce<Array>(detail::protect([&] {
         return std::apply(
             [](auto... v) { return ::rb_ary_new_from_args(sizeof...(v), v.as_VALUE()...); },
@@ -921,6 +924,26 @@ namespace rcx {
     }
     return detail::unsafe_coerce<Array>(value.as_VALUE());
   }
+
+  template <concepts::ConvertibleFromValue... T>
+  inline decltype(auto) convert::FromValue<std::tuple<T...>>::convert(Value value) {
+    auto array = from_Value<Array>(value);
+    if(array.size() != sizeof...(T)) {
+      throw RubyError::format(
+          builtin::ArgumentError(), "Array of length {} is expected", sizeof...(T));
+    }
+    return [array]<size_t... I>(std::index_sequence<I...>) {
+      return std::make_tuple(array.at<T>(I)...);
+    }(std::make_index_sequence<sizeof...(T)>());
+  }
+
+  template <concepts::ConvertibleIntoValue... T>
+  Value IntoValue<std::tuple<T...>>::convert(std::tuple<T...> value) {
+    return [&value]<size_t... I>(std::index_sequence<I...>) {
+      return Array::new_from(
+          std::tuple{into_Value<decltype(std::get<I>(value))>(std::get<I>(value))...});
+    }(std::make_index_sequence<sizeof...(T)>());
+  };
 
   /// Misc
 

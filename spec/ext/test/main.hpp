@@ -51,4 +51,7 @@ public:
 class Associated: public WrappedStruct<TwoWayAssociation> {
 public:
   Associated &return_self();
+
+  static std::tuple<Associated const &, Associated const &> swap(
+      Value, std::tuple<Associated const &, Associated const &>);
 };
