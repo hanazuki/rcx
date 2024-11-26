@@ -375,22 +375,22 @@ namespace rcx {
         .wrap_struct_name = strdup(klass.name().data()),  // let it leek
         .function = {
           .dmark =
-              [](void *RCX_Nonnull p) {
+              [](void *RCX_Nonnull p) noexcept {
                 using typed_data::dmark;
                 dmark(gc::Marking(), static_cast<T *>(p));
               },
           .dfree =
-              [](void *RCX_Nonnull p) {
+              [](void *RCX_Nonnull p) noexcept {
                 using typed_data::dfree;
                 dfree(static_cast<T *>(p));
               },
           .dsize =
-              [](void const *RCX_Nonnull p) {
+              [](void const *RCX_Nonnull p) noexcept {
                 using typed_data::dsize;
                 return dsize(static_cast<T const *>(p));
               },
           .dcompact =
-              [](void *RCX_Nonnull p) {
+              [](void *RCX_Nonnull p) noexcept {
                 using typed_data::dcompact;
                 dcompact(gc::Compaction(), static_cast<T *>(p));
               },
