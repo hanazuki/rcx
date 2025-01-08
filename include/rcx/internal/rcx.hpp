@@ -585,6 +585,9 @@ namespace rcx {
 
       template <std::derived_from<ValueBase>... T>
       static Array new_from(std::tuple<T...> const &elements);
+
+      static Array new_array();
+      static Array new_array(long capacity);
     };
 
     template <std::derived_from<ValueBase> T> class PinnedOpt {

@@ -916,6 +916,14 @@ namespace rcx {
             elements);
       }));
     }
+
+    inline Array Array::new_array() {
+      return detail::unsafe_coerce<Array>(::rb_ary_new());
+    }
+
+    inline Array Array::new_array(long capacity) {
+      return detail::unsafe_coerce<Array>(::rb_ary_new_capa(capacity));
+    }
   }
 
   inline Array convert::FromValue<Array>::convert(Value value) {

@@ -168,6 +168,16 @@ Value Test::test_singleton_method(Value self) {
 
 Value Test::test_array([[maybe_unused]] Value self) {
   {
+    auto const a = Array::new_array();
+    ASSERT_EQ(0u, a.size());
+  }
+
+  {
+    auto const a = Array::new_array(3);
+    ASSERT_EQ(0u, a.size());
+  }
+
+  {
     std::array const vs{"a"_str, "b"_str};
     auto const a = Array::new_from(vs);
     ASSERT_EQ(2u, a.size());
