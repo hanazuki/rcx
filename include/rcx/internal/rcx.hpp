@@ -588,6 +588,11 @@ namespace rcx {
 
       static Array new_array();
       static Array new_array(long capacity);
+
+      template <concepts::ConvertibleIntoValue T = Value> Array push_back(T value) const;
+      template <concepts::ConvertibleFromValue T = Value> T pop_back() const;
+      template <concepts::ConvertibleIntoValue T = Value> Array push_front(T value) const;
+      template <concepts::ConvertibleFromValue T = Value> T pop_front() const;
     };
 
     template <std::derived_from<ValueBase> T> class PinnedOpt {

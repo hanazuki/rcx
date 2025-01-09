@@ -7,6 +7,7 @@
 #include <rcx/rcx.hpp>
 
 #include "assert.hpp"
+#include "rcx/internal/rcx.hpp"
 
 using namespace rcx::value;
 using namespace rcx::literals;
@@ -194,6 +195,19 @@ Value Test::test_array([[maybe_unused]] Value self) {
     ASSERT_EQ(2u, a.size());
     ASSERT_EQ(1, a.at<int>(0));
     ASSERT_EQ(1, a.at<int>(1));
+  }
+
+  {
+    auto const a = Array::new_from({rcx::into_Value(1), rcx::into_Value(2)});
+    a.push_back(5);
+    ASSERT_EQ(3, a.size());
+    ASSERT_EQ(5, a.pop_back<int>());
+    ASSERT_EQ(2, a.size());
+
+    a.push_front(6);
+    ASSERT_EQ(3, a.size());
+    ASSERT_EQ(6, a.pop_front<int>());
+    ASSERT_EQ(2, a.size());
   }
 
   return Value::qtrue;

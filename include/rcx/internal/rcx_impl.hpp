@@ -918,11 +918,34 @@ namespace rcx {
     }
 
     inline Array Array::new_array() {
-      return detail::unsafe_coerce<Array>(::rb_ary_new());
+      return detail::unsafe_coerce<Array>(detail::protect([] { return ::rb_ary_new(); }));
     }
 
     inline Array Array::new_array(long capacity) {
-      return detail::unsafe_coerce<Array>(::rb_ary_new_capa(capacity));
+      return detail::unsafe_coerce<Array>(
+          detail::protect([capacity] { return ::rb_ary_new_capa(capacity); }));
+    }
+
+    template <concepts::ConvertibleIntoValue T> Array Array::push_back(T value) const {
+      auto const v = into_Value<T>(value);
+      detail::protect([v, this] { ::rb_ary_push(as_VALUE(), v.as_VALUE()); });
+      return *this;
+    }
+
+    template <concepts::ConvertibleFromValue T> inline T Array::pop_back() const {
+      return from_Value<T>(detail::unsafe_coerce<Value>(
+          detail::protect([this] { return ::rb_ary_pop(as_VALUE()); })));
+    }
+
+    template <concepts::ConvertibleIntoValue T> Array Array::push_front(T value) const {
+      auto const v = into_Value<T>(value);
+      detail::protect([v, this] { ::rb_ary_unshift(as_VALUE(), v.as_VALUE()); });
+      return *this;
+    }
+
+    template <concepts::ConvertibleFromValue T> inline T Array::pop_front() const {
+      return from_Value<T>(detail::unsafe_coerce<Value>(
+          detail::protect([this] { return ::rb_ary_shift(as_VALUE()); })));
     }
   }
 
