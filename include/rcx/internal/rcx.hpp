@@ -656,16 +656,32 @@ namespace rcx {
     template <std::derived_from<ValueBase> T> Pinned(T) -> Pinned<T>;
   }
 
+  namespace typed_data {
+    template <typename> class DataTypeStorage;
+  }
+
   namespace gc {
-    struct Marking;
-    struct Compaction;
+    enum Phase {
+      Marking,
+      Compaction,
+    };
+
+    struct Gc {
+      template <std::derived_from<ValueBase> T> void mark_movable(T &value) const noexcept;
+      void mark_pinned(ValueBase value) const noexcept;
+
+    private:
+      Phase phase_;
+
+      Gc(Phase phase);
+      template <typename> friend class typed_data::DataTypeStorage;
+    };
   }
 
   namespace typed_data {
-    template <typename T> void dmark(gc::Marking, T *RCX_Nonnull) noexcept;
+    template <typename T> void dmark(gc::Gc, T *RCX_Nonnull) noexcept;
     template <typename T> void dfree(T *RCX_Nonnull) noexcept;
     template <typename T> size_t dsize(T const *RCX_Nonnull) noexcept;
-    template <typename T> void dcompact(gc::Compaction, T *RCX_Nonnull) noexcept;
 
     struct AssociatedValue {
       std::optional<Value> value_;
@@ -689,9 +705,9 @@ namespace rcx {
         return value_;
       };
 
-      void replace_associated_value(std::invocable<Value> auto f) noexcept {
+      void mark_associated_value(gc::Gc gc) noexcept {
         if(value_) {
-          value_ = f(*value_);
+          gc.mark_movable(*value_);
         }
       }
     };
@@ -700,9 +716,7 @@ namespace rcx {
     struct TwoWayAssociation: public AssociatedValue {};
 
     template <std::derived_from<TwoWayAssociation> T>
-    void dmark(gc::Marking gc, T *RCX_Nonnull p) noexcept;
-    template <std::derived_from<TwoWayAssociation> T>
-    void dcompact(gc::Compaction gc, T *RCX_Nonnull p) noexcept;
+    void dmark(gc::Gc gc, T *RCX_Nonnull p) noexcept;
 
     struct WrappedStructBase {};
 
@@ -739,25 +753,6 @@ namespace rcx {
     };
     template <std::derived_from<typed_data::TwoWayAssociation> T> struct IntoValue<T> {
       Value convert(T &value);
-    };
-  }
-
-  namespace gc {
-    struct Marking {
-      void mark_movable(Value value) const noexcept;
-      void mark_pinned(Value value) const noexcept;
-
-    private:
-      Marking() = default;
-      template <typename> friend class typed_data::DataTypeStorage;
-    };
-
-    struct Compaction {
-      template <std::derived_from<ValueBase> T> T new_location(T value) const noexcept;
-
-    private:
-      Compaction() = default;
-      template <typename> friend class typed_data::DataTypeStorage;
     };
   }
 

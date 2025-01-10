@@ -10,6 +10,7 @@
 #include <ffi.h>
 #include <rcx/internal/rcx.hpp>
 
+#include "ruby/internal/gc.h"
 #include "ruby/internal/intern/proc.h"
 #include "ruby/internal/special_consts.h"
 
@@ -330,7 +331,7 @@ namespace rcx {
   }
 
   namespace typed_data {
-    template <typename T> void dmark(gc::Marking, T *RCX_Nonnull) noexcept {
+    template <typename T> void dmark(gc::Gc, T *RCX_Nonnull) noexcept {
       // noop
     }
     template <typename T> void dfree(T *RCX_Nonnull p) noexcept {
@@ -338,9 +339,6 @@ namespace rcx {
     }
     template <typename T> size_t dsize(T const *RCX_Nonnull) noexcept {
       return sizeof(T);
-    }
-    template <typename T> void dcompact(gc::Compaction, T *RCX_Nonnull) noexcept {
-      // noop
     }
 
     template <typename T, typename S>
@@ -384,7 +382,7 @@ namespace rcx {
           .dmark =
               [](void *RCX_Nonnull p) noexcept {
                 using typed_data::dmark;
-                dmark(gc::Marking(), static_cast<T *>(p));
+                dmark(gc::Gc(gc::Phase::Marking), static_cast<T *>(p));
               },
           .dfree =
               [](void *RCX_Nonnull p) noexcept {
@@ -398,8 +396,8 @@ namespace rcx {
               },
           .dcompact =
               [](void *RCX_Nonnull p) noexcept {
-                using typed_data::dcompact;
-                dcompact(gc::Compaction(), static_cast<T *>(p));
+                using typed_data::dmark;
+                dmark(gc::Gc(gc::Phase::Compaction), static_cast<T *>(p));
               },
           // .reserved is zero-initialized
         },
@@ -438,28 +436,37 @@ namespace rcx {
     }
 
     template <std::derived_from<TwoWayAssociation> T>
-    inline void dmark(gc::Marking gc, T *RCX_Nonnull p) noexcept {
-      if(auto v = p->get_associated_value()) {
-        gc.mark_movable(*v);
-      }
-    }
-
-    template <std::derived_from<TwoWayAssociation> T>
-    inline void dcompact(gc::Compaction gc, T *RCX_Nonnull p) noexcept {
-      p->replace_associated_value([gc](Value v) noexcept { return gc.new_location(v); });
+    inline void dmark(gc::Gc gc, T *RCX_Nonnull p) noexcept {
+      p->mark_associated_value(gc);
     }
   }
 
   namespace gc {
-    inline void Marking::mark_movable(Value value) const noexcept {
-      ::rb_gc_mark_movable(value.as_VALUE());
-    }
-    inline void Marking::mark_pinned(Value value) const noexcept {
-      ::rb_gc_mark(value.as_VALUE());
+    inline Gc::Gc(Phase phase): phase_(phase) {
     }
 
-    template <std::derived_from<ValueBase> T> T Compaction::new_location(T value) const noexcept {
-      return detail::unsafe_coerce<T>(::rb_gc_location(value.as_VALUE()));
+    template <std::derived_from<ValueBase> T>
+    inline void Gc::mark_movable(T &value) const noexcept {
+      switch(phase_) {
+      case Phase::Marking:
+        ::rb_gc_mark_movable(value.as_VALUE());
+        break;
+      case Phase::Compaction:
+        value = detail::unsafe_coerce<T>(::rb_gc_location(value.as_VALUE()));
+        break;
+      default:;  // unreachable
+      }
+    }
+    inline void Gc::mark_pinned(ValueBase value) const noexcept {
+      switch(phase_) {
+      case Phase::Marking:
+        ::rb_gc_mark(value.as_VALUE());
+        break;
+      case Phase::Compaction:
+        // no-op
+        break;
+      default:;  // unreachable
+      }
     }
   }
 
