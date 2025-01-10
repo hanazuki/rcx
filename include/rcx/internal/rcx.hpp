@@ -43,6 +43,7 @@ namespace rcx {
     template <typename T = Value> class ClassT;
     using Class = ClassT<Value>;
     class Symbol;
+    class Proc;
     class String;
     class Array;
   }
@@ -195,6 +196,10 @@ namespace rcx {
       Symbol convert(Value value);
     };
 
+    template <> struct FromValue<Proc> {
+      Proc convert(Value value);
+    };
+
     template <> struct FromValue<String> {
       String convert(Value value);
     };
@@ -257,12 +262,18 @@ namespace rcx {
       static ResultType parse(Ruby &, Value self, std::span<Value> &args);
     };
 
+    struct Block {
+      using ResultType = Proc;
+      static ResultType parse(Ruby &, Value self, std::span<Value> &args);
+    };
+
     template <concepts::ConvertibleFromValue T = Value> constexpr inline Self<T> self;
     template <concepts::ConvertibleFromValue T = Value, detail::cxstring name = "">
     constexpr inline Arg<T, name> arg;
     template <concepts::ConvertibleFromValue T = Value, detail::cxstring name = "">
     constexpr inline ArgOpt<T, name> arg_opt;
     template <concepts::ConvertibleFromValue T = Value> constexpr inline ArgSplat<T> arg_splat;
+    constexpr inline Block block;
   }
 
   namespace concepts {
@@ -408,6 +419,7 @@ namespace rcx {
       template <concepts::ConvertibleFromValue R = Value>
       R send(concepts::Identifier auto &&mid, concepts::ConvertibleIntoValue auto &&...args) const;
 
+      bool test() const;
       String inspect() const;
 
       static Value const qnil;
@@ -601,6 +613,14 @@ namespace rcx {
       template <concepts::ConvertibleFromValue T = Value> T pop_back() const;
       template <concepts::ConvertibleIntoValue T = Value> Array push_front(T value) const;
       template <concepts::ConvertibleFromValue T = Value> T pop_front() const;
+    };
+
+    class Proc: public ValueT<Proc, Value> {
+    public:
+      using ValueT<Proc, Value>::ValueT;
+
+      bool is_lambda() const;
+      Value call(Array args) const;
     };
 
     template <std::derived_from<ValueBase> T> class PinnedOpt {

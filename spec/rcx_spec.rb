@@ -134,6 +134,16 @@ RSpec.describe 'test ext' do
       }
     end
 
+    specify 'block' do
+      obj = Base.new('hello')
+
+      ret = obj.with_block('A') {|x|
+        expect(x).to eq 'A'
+        'B'
+      }
+      expect(ret).to eq 'B'
+    end
+
     specify 'clone' do
       obj = Base.new('hello')
       obj2 = obj.clone

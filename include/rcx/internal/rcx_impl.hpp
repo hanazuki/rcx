@@ -10,6 +10,9 @@
 #include <ffi.h>
 #include <rcx/internal/rcx.hpp>
 
+#include "ruby/internal/intern/proc.h"
+#include "ruby/internal/special_consts.h"
+
 #if HAVE_CXXABI_H
 #include <cxxabi.h>
 #endif
@@ -229,6 +232,10 @@ namespace rcx {
         args = std::ranges::drop_view(args, 1);
       }
       return args;
+    }
+
+    inline Block::ResultType Block::parse(Ruby &, Value, std::span<Value> &) {
+      return detail::unsafe_coerce<Proc>(detail::protect([] { return ::rb_block_proc(); }));
     }
   }
 
@@ -570,6 +577,10 @@ namespace rcx {
       })));
     }
 
+    inline bool Value::test() const {
+      return RB_TEST(as_VALUE());
+    }
+
     inline String Value::inspect() const {
       return detail::unsafe_coerce<String>(
           detail::protect([&] { return ::rb_inspect(as_VALUE()); }));
@@ -827,6 +838,30 @@ namespace rcx {
   }
   inline std::string_view convert::FromValue<std::string_view>::convert(Value value) {
     return std::string_view(from_Value<String>(value));
+  }
+
+  /// Proc
+
+  namespace value {
+    inline bool Proc::is_lambda() const {
+      Value const v = detail::unsafe_coerce<Value>(
+          detail::protect([&] { return ::rb_proc_lambda_p(as_VALUE()); }));
+      return v.test();
+    }
+
+    inline Value Proc::call(Array args) const {
+      return detail::unsafe_coerce<Value>(
+          detail::protect([&] { return ::rb_proc_call(as_VALUE(), args.as_VALUE()); }));
+    }
+  }
+
+  namespace convert {
+    inline Proc convert::FromValue<Proc>::convert(Value value) {
+      if(rb_obj_is_proc(value.as_VALUE())) {
+        rb_raise(rb_eTypeError, "Expected a Proc but got a %s", rb_obj_classname(value.as_VALUE()));
+      }
+      return detail::unsafe_coerce<Proc>{value.as_VALUE()};
+    };
   }
 
   /// Pinned
