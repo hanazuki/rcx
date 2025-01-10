@@ -956,6 +956,16 @@ namespace rcx {
     return detail::unsafe_coerce<Array>(value.as_VALUE());
   }
 
+  template <concepts::ConvertibleFromValue T>
+  decltype(auto) FromValue<std::optional<T>>::convert(Value v) {
+    return v.is_nil() ? std::nullopt : from_Value<T>(v);
+  }
+
+  template <concepts::ConvertibleIntoValue T>
+  Value IntoValue<std::optional<T>>::convert(std::optional<T> value) {
+    return value ? Value::qnil : into_Value(*value);
+  }
+
   template <concepts::ConvertibleFromValue... T>
   inline decltype(auto) convert::FromValue<std::tuple<T...>>::convert(Value value) {
     auto array = from_Value<Array>(value);

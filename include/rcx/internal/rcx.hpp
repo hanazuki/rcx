@@ -219,6 +219,14 @@ namespace rcx {
   }
 
   namespace convert {
+    template <concepts::ConvertibleFromValue T> struct FromValue<std::optional<T>> {
+      decltype(auto) convert(Value v);
+    };
+
+    template <concepts::ConvertibleIntoValue T> struct IntoValue<std::optional<T>> {
+      Value convert(std::optional<T> value);
+    };
+
     template <concepts::ConvertibleFromValue... T> struct FromValue<std::tuple<T...>> {
       decltype(auto) convert(Value value);
     };
