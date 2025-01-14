@@ -835,6 +835,14 @@ namespace rcx {
     inline String::operator std::string_view() const noexcept {
       return {data(), size()};
     }
+
+    inline String String::locktmp() const {
+      return detail::unsafe_coerce<String>(detail::protect(::rb_str_locktmp, as_VALUE()));
+    }
+
+    inline String String::unlocktmp() const {
+      return detail::unsafe_coerce<String>(detail::protect(::rb_str_unlocktmp, as_VALUE()));
+    }
   }
 
   inline String convert::FromValue<String>::convert(Value value) {
