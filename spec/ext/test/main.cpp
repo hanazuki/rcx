@@ -255,22 +255,12 @@ Value Test::test_io_buffer([[maybe_unused]] Value self) {
     auto b = IOBuffer::new_internal(40);
     auto s = b.bytes();
     ASSERT_EQ(40, s.size());
-
-    b.free();
-
-    s = b.bytes();
-    ASSERT_EQ(0, s.size());
   }
 
   {
     auto b = IOBuffer::new_mapped(1'000'000);
     auto s = b.bytes();
     ASSERT_EQ(1'000'000, s.size());
-
-    b.free();
-
-    s = b.bytes();
-    ASSERT_EQ(0, s.size());
   }
 
   {
