@@ -17,6 +17,7 @@
 
 #include <ruby.h>
 #include <ruby/encoding.h>
+#include <ruby/io/buffer.h>
 
 #define rcx_assert(expr) assert((expr))
 #define rcx_delete(reason) delete
@@ -27,6 +28,10 @@
 #else
 #define RCX_Nullable
 #define RCX_Nonnull
+#endif
+
+#if RUBY_IO_BUFFER_VERSION == 2
+#define RCX_IO_BUFFER
 #endif
 
 namespace rcx {
@@ -46,6 +51,9 @@ namespace rcx {
     class Proc;
     class String;
     class Array;
+#ifdef RCX_IO_BUFFER
+    class IOBuffer;
+#endif
   }
   using namespace value;
 
@@ -210,6 +218,12 @@ namespace rcx {
     template <> struct FromValue<Array> {
       Array convert(Value value);
     };
+
+#ifdef RCX_IO_BUFFER
+    template <> struct FromValue<IOBuffer> {
+      IOBuffer convert(Value value);
+    };
+#endif
   }
   using namespace convert;
 
@@ -376,12 +390,6 @@ namespace rcx {
       bool is_frozen() const;
       template <typename T> bool is_instance_of(ClassT<T> klass) const;
       template <typename T> bool is_kind_of(ClassT<T> klass) const;
-    };
-
-    class Nonnil {
-      Nonnil() = rcx_delete("This type of Value is non-nilable.");
-      Nonnil(Nonnil const &) = default;
-      Nonnil &operator=(Nonnil const &) = default;
     };
 
     template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable = Nonnil>
@@ -625,6 +633,49 @@ namespace rcx {
       bool is_lambda() const;
       Value call(Array args) const;
     };
+
+#ifdef RCX_IO_BUFFER
+    /// Represents an `IO::Buffer` object.
+    class IOBuffer: public ValueT<IOBuffer, Value> {
+    public:
+      using ValueT<IOBuffer, Value>::ValueT;
+
+      /// Creates an `IO::Buffer` with internal storage.
+      static IOBuffer new_internal(size_t size);
+      /// Creates an `IO::Buffer` with mapped storage.
+      static IOBuffer new_mapped(size_t size);
+      /// Creates an `IO::Buffer` with externally managed storage. The returned `IO::Buffer` should
+      /// be `free`d when the underlying storage is longer valid.
+      template <size_t N = std::dynamic_extent>
+      static IOBuffer new_external(std::span<std::byte, N> bytes [[clang::lifetimebound]]);
+      /// Creates an `IO::Buffer` with externally managed read-only storage. The returned
+      /// `IO::Buffer` should be `free`d when the underlying storage is longer valid.
+      template <size_t N = std::dynamic_extent>
+      static IOBuffer new_external(std::span<std::byte const, N> bytes [[clang::lifetimebound]]);
+
+      /// Frees the internal storage or disassociates the external storage (See the Ruby
+      /// documentation for `IO::Buffer#free`).
+      void free() const;
+      /// Resizes the `IO::Buffer` to the given size.
+      void resize(size_t size) const;
+
+      /// Returns the bytes of the `IO::Buffer`. This will raise if the `IO::Buffer` is not
+      /// writable.
+      std::span<std::byte> bytes() const;
+      /// Returns the bytes of the `IO::Buffer` as a read-only span.
+      std::span<std::byte const> cbytes() const;
+
+      // BasicLockable
+      /// Locks the `IO::Buffer`.
+      void lock() const;
+      /// Unlocks the `IO::Buffer`.
+      void unlock() const;
+
+      // Lockable
+      /// Tries to lock the `IO::Buffer`.
+      bool try_lock() const;
+    };
+#endif
 
     template <std::derived_from<ValueBase> T> class PinnedOpt {
     protected:

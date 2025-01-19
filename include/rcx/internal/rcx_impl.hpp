@@ -10,9 +10,8 @@
 #include <ffi.h>
 #include <rcx/internal/rcx.hpp>
 
-#include "ruby/internal/gc.h"
-#include "ruby/internal/intern/proc.h"
-#include "ruby/internal/special_consts.h"
+#include "ruby/internal/intern/object.h"
+#include "ruby/internal/xmalloc.h"
 
 #if HAVE_CXXABI_H
 #include <cxxabi.h>
@@ -872,12 +871,95 @@ namespace rcx {
 
   namespace convert {
     inline Proc convert::FromValue<Proc>::convert(Value value) {
-      if(rb_obj_is_proc(value.as_VALUE())) {
+      if(!rb_obj_is_proc(value.as_VALUE())) {
         rb_raise(rb_eTypeError, "Expected a Proc but got a %s", rb_obj_classname(value.as_VALUE()));
       }
       return detail::unsafe_coerce<Proc>{value.as_VALUE()};
     };
   }
+
+#ifdef RCX_IO_BUFFER
+  /// IOBuffer
+  namespace value {
+
+    inline IOBuffer IOBuffer::new_internal(size_t size) {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([size] {
+        // Let Ruby allocate a buffer
+        return ::rb_io_buffer_new(nullptr, size, RB_IO_BUFFER_INTERNAL);
+      }));
+    }
+
+    inline IOBuffer IOBuffer::new_mapped(size_t size) {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([size] {
+        // Let Ruby allocate a buffer
+        return ::rb_io_buffer_new(nullptr, size, RB_IO_BUFFER_MAPPED);
+      }));
+    }
+
+    template <size_t N> inline IOBuffer IOBuffer::new_external(std::span<std::byte, N> bytes) {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([bytes] {
+        return ::rb_io_buffer_new(bytes.data(), bytes.size(), RB_IO_BUFFER_EXTERNAL);
+      }));
+    }
+
+    template <size_t N>
+    inline IOBuffer IOBuffer::new_external(std::span<std::byte const, N> bytes) {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([bytes] {
+        return ::rb_io_buffer_new(const_cast<std::byte *>(bytes.data()), bytes.size(),
+            static_cast<rb_io_buffer_flags>(RB_IO_BUFFER_EXTERNAL | RB_IO_BUFFER_READONLY));
+      }));
+    }
+
+    inline void IOBuffer::free() const {
+      detail::protect([this] { ::rb_io_buffer_free(as_VALUE()); });
+    }
+
+    inline void IOBuffer::resize(size_t size) const {
+      detail::protect([this, size] { ::rb_io_buffer_resize(as_VALUE(), size); });
+    }
+
+    inline std::span<std::byte> IOBuffer::bytes() const {
+      void *ptr;
+      size_t size;
+      detail::protect([&] { ::rb_io_buffer_get_bytes_for_writing(as_VALUE(), &ptr, &size); });
+      return {static_cast<std::byte *>(ptr), size};
+    }
+
+    inline std::span<std::byte const> IOBuffer::cbytes() const {
+      void const *ptr;
+      size_t size;
+      detail::protect([&] { ::rb_io_buffer_get_bytes_for_reading(as_VALUE(), &ptr, &size); });
+      return {static_cast<std::byte const *>(ptr), size};
+    }
+
+    inline void IOBuffer::lock() const {
+      detail::protect([this] { ::rb_io_buffer_lock(as_VALUE()); });
+    }
+
+    inline void IOBuffer::unlock() const {
+      detail::protect([this] { ::rb_io_buffer_unlock(as_VALUE()); });
+    }
+
+    inline bool IOBuffer::try_lock() const {
+      try {
+        lock();
+        return true;
+      } catch(RubyError const &) {
+        return false;
+      }
+    }
+  }
+
+  namespace convert {
+    inline IOBuffer FromValue<IOBuffer>::convert(Value value) {
+      if(!rb_obj_is_kind_of(value.as_VALUE(), rb_cIOBuffer)) {
+        rb_raise(
+            rb_eTypeError, "Expected an IOBuffer but got a %s", rb_obj_classname(value.as_VALUE()));
+      }
+      return detail::unsafe_coerce<IOBuffer>(value.as_VALUE());
+    }
+  }
+#endif
 
   /// Pinned
 

@@ -24,3 +24,12 @@
       rb_raise(rb_eExpectationNotMetError(), "%s:%d: Expected %s not to equal to: %s", __FILE__,   \
           __LINE__, #EXP, #V);                                                                     \
   }((EXP), (V))
+#define ASSERT_RAISE(V)                                                                            \
+  [](auto F) {                                                                                     \
+    try {                                                                                          \
+      F();                                                                                         \
+    } catch(rcx::RubyError const &e) {                                                             \
+      return;                                                                                      \
+    }                                                                                              \
+    rb_raise(rb_eExpectationNotMetError(), "%s:%d: Expected %s to raise", __FILE__, __LINE__, #V); \
+  }((V))

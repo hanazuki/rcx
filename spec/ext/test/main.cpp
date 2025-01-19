@@ -2,6 +2,8 @@
 
 #include <cmath>
 #include <limits>
+#include <mutex>
+#include <span>
 #include <stdexcept>
 
 #include <rcx/rcx.hpp>
@@ -246,6 +248,69 @@ Value Test::test_allocate([[maybe_unused]] Value self) {
   return Value::qtrue;
 }
 
+Value Test::test_io_buffer([[maybe_unused]] Value self) {
+  {
+    auto b = IOBuffer::new_internal(40);
+    auto s = b.bytes();
+    ASSERT_EQ(40, s.size());
+
+    b.free();
+
+    s = b.bytes();
+    ASSERT_EQ(0, s.size());
+  }
+
+  {
+    auto b = IOBuffer::new_mapped(1'000'000);
+    auto s = b.bytes();
+    ASSERT_EQ(1'000'000, s.size());
+
+    b.free();
+
+    s = b.bytes();
+    ASSERT_EQ(0, s.size());
+  }
+
+  {
+    char a[100];
+    auto b = IOBuffer::new_external(std::as_writable_bytes(std::span{a}));
+    auto s = b.bytes();
+    ASSERT_EQ(100, s.size());
+    s[10] = std::byte{42};
+
+    ASSERT_EQ(std::byte{42}, b.cbytes()[10]);
+
+    b.free();
+  }
+
+  {
+    char a[100];
+    auto b = IOBuffer::new_external(std::as_bytes(std::span{a}));
+    ASSERT_RAISE([&] { b.bytes(); });
+
+    b.free();
+  }
+
+  {
+    auto b = IOBuffer::new_internal(100);
+    b.resize(200);
+    ASSERT_EQ(200, b.bytes().size());
+
+    std::scoped_lock lock(b);
+
+    ASSERT_RAISE([&] { b.resize(300); });
+  }
+
+  {
+    auto b1 = IOBuffer::new_internal(100);
+    auto b2 = IOBuffer::new_internal(100);
+
+    std::scoped_lock lock(b1, b2);
+  }
+
+  return Value::qtrue;
+}
+
 Base::Base(String string): string_(std::string_view(string)) {
 }
 
@@ -317,7 +382,8 @@ extern "C" void Init_test() {
                    .define_method("test_const", &Test::test_const)
                    .define_method("test_singleton_method", &Test::test_singleton_method)
                    .define_method("test_pinning", &Test::test_pinning)
-                   .define_method("test_allocate", &Test::test_allocate);
+                   .define_method("test_allocate", &Test::test_allocate)
+                   .define_method("test_io_buffer", &Test::test_io_buffer);
 
   cBase = ruby.define_class<Base>("Base")
               .define_constructor(arg<String, "string">)
