@@ -10,9 +10,6 @@
 #include <ffi.h>
 #include <rcx/internal/rcx.hpp>
 
-#include "ruby/internal/intern/object.h"
-#include "ruby/internal/xmalloc.h"
-
 #if HAVE_CXXABI_H
 #include <cxxabi.h>
 #endif
