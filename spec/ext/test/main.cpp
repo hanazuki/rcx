@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSL-1.0
+// SPDX-FileCopyrightText: Copyright 2024-2025 Kasumi Hanazuki <kasumi@rollingapple.net>
 #include "main.hpp"
 
 #include <cmath>

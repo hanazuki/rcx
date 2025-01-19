@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSL-1.0
+# SPDX-FileCopyrightText: Copyright 2024-2025 Kasumi Hanazuki <kasumi@rollingapple.net>
+
 require 'bundler/gem_tasks'
 require 'rspec/core/rake_task'
 require 'rake/extensiontask'

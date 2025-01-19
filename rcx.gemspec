@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.summary = "Write Ruby extension in modern C++"
   spec.description = "Write Ruby extension in modern C++"
   spec.homepage = "https://github.com/hanazuki/rcx"
-  spec.license = "Zlib"
+  spec.license = "BSL-1.0"
   spec.required_ruby_version = ">= 3.1.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
