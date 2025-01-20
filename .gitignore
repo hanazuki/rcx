@@ -7,6 +7,8 @@ pkg/
 spec/reports/
 tmp/
 .cache/
+node_modules/
+.yarn/
 
 # rspec failure tracking
 .rspec_status
@@ -14,3 +16,4 @@ tmp/
 compile_commands.json
 *.so
 *.dll
+*.log

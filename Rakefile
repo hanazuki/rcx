@@ -22,3 +22,18 @@ RSpec::Core::RakeTask.new(:spec)
 task :spec => :compile
 
 task :default => :spec
+
+desc 'Generate documentation'
+task :doc => :doxygen do
+  cp 'LICENSE.txt', 'tmp/doxygen/html'
+end
+
+directory 'tmp/doxygen'
+
+task :doxygen => [:yarn_install, 'tmp/doxygen'] do
+  sh 'doxygen'
+end
+
+task :yarn_install do
+  sh 'yarn', 'install'
+end
