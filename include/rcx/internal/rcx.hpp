@@ -610,13 +610,16 @@ namespace rcx {
     public:
       using ValueT<ClassT<T>, Module>::ValueT;
 
-      auto new_instance(concepts::ConvertibleIntoValue auto &&...args) const -> auto;
+      /// Allocates and initializes an instance of this class.
+      ///
+      /// @param args The arguments to be passed to `initialize.
+      /// @return The new instance.
+      T new_instance(concepts::ConvertibleIntoValue auto &&...args) const
+        requires std::derived_from<T, ValueBase>;
 
-      /**
-       * Allocates an uninitialized instance of this class.
-       *
-       * @returns Uninitialized object. This object should be initialized before use.
-       */
+      /// Allocates an uninitialized instance of this class.
+      ///
+      /// @returns Uninitialized object.
       Value allocate() const;
 
       template <concepts::ArgSpec... ArgSpec>

@@ -675,10 +675,9 @@ namespace rcx {
 
   namespace value {
     template <typename T>
-    inline auto ClassT<T>::new_instance(concepts::ConvertibleIntoValue auto &&...args) const
-        -> auto {
-      static_assert(std::derived_from<T, ValueBase>);
-
+    inline T ClassT<T>::new_instance(concepts::ConvertibleIntoValue auto &&...args) const
+      requires std::derived_from<T, ValueBase>
+    {
       std::array<VALUE, sizeof...(args)> vargs{
         into_Value(std::forward<decltype(args)>(args)).as_VALUE()...};
       return detail::unsafe_coerce<T>(detail::protect(
