@@ -619,27 +619,60 @@ namespace rcx {
 
       /// Allocates an uninitialized instance of this class.
       ///
-      /// @returns Uninitialized object.
+      /// @returns The newly allocated uninitialized object.
       Value allocate() const;
 
+      /// Defines a mutating instance method.
+      ///
+      /// The method will raise a `FrozenError` if the object is frozen.
+      /// @param mid The name of the method.
+      /// @param function The function to be called.
+      /// @param argspec List of argument specifications.
+      /// @return Self.
+      /// @warning Defining method this way allocates a resource that will never be
+      /// garbage-collected.
       template <concepts::ArgSpec... ArgSpec>
       ClassT<T> define_method(concepts::Identifier auto &&mid,
           std::invocable<T &, typename ArgSpec::ResultType...> auto &&function,
           ArgSpec... argspec) const;
 
+      /// Defines a non-mutating instance method.
+      ///
+      /// The method can be called even when the object is frozen.
+      /// @param mid The name of the method.
+      /// @param function The function to be called.
+      /// @param argspec List of argument specifications.
+      /// @return Self.
+      /// @warning Defining method this way allocates a resource that will never be
+      /// garbage-collected.
       template <concepts::ArgSpec... ArgSpec>
       ClassT<T> define_method_const(concepts::Identifier auto &&mid,
           std::invocable<T const &, typename ArgSpec::ResultType...> auto &&function,
           ArgSpec... argspec) const;
 
+      /// Defines `initialize` method using a C++ constructor.
+      ///
+      /// @param argspec List of argument specifications.
+      /// @return Self.
       template <concepts::ArgSpec... ArgSpec>
         requires std::constructible_from<T, typename ArgSpec::ResultType...>
       ClassT<T> define_constructor(ArgSpec... argspec) const;
 
+      /// Defines `initialize_copy` method using the C++ copy constructor.
+      ///
+      /// @return Self.
       ClassT<T> define_copy_constructor() const
         requires std::copy_constructible<T>;
 
+      /// Creates a new class.
+      ///
+      /// @return The newly created class.
       static Class new_class();
+
+      /// Creates a new class with a superclass.
+      ///
+      /// @param superclass The new class will be a subclass of this class.
+      /// @return The newly created class.
       template <typename S> static ClassT<S> new_class(ClassT<S> superclass);
     };
 
