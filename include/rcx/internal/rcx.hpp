@@ -36,6 +36,8 @@
 #define RCX_IO_BUFFER
 #endif
 
+/// RCX
+///
 namespace rcx {
   class Ruby;
   class Id;
@@ -59,6 +61,8 @@ namespace rcx {
   }
   using namespace value;
 
+  /// Concepts
+  ///
   namespace concepts {
     template <typename T>
     concept StringLike = requires {
@@ -68,12 +72,18 @@ namespace rcx {
           typename std::remove_cvref_t<T>::traits_type>;
     };
 
+    /// Specifies the types that can be used as Ruby identifiers.
+    ///
+    /// This includes \ref rcx::Id, \ref rcx::value::Symbol and C++ strings.
     template <typename T>
     concept Identifier = requires(T id) {
       { id.as_ID() } noexcept -> std::same_as<ID>;
     } || std::is_nothrow_constructible_v<Symbol, T>;
   }
 
+  /// Implementation details.
+  ///
+  /// @private
   namespace detail {
     template <typename T> struct unsafe_coerce {
       VALUE value;
@@ -87,8 +97,11 @@ namespace rcx {
 
     template <typename T> inline constexpr bool always_false_v = false;
 
-    // Duplicated definition for cxstring and u8cxstring, because clang-18 does not
-    // support template parameter deduction for type aliases.
+    // Duplicated definition for cxstring and u8cxstring instead of parameterize char type, because
+    // clang-18 does not support template parameter deduction for type aliases.
+
+    /// Represents a compile-time binary string.
+    ///
     template <size_t N> struct cxstring {
       using value_type = char;
       using traits_type = std::char_traits<value_type>;
@@ -113,6 +126,8 @@ namespace rcx {
       }
     };
 
+    /// Represents a compile-time UTF-8 string.
+    ///
     template <size_t N> struct u8cxstring {
       using value_type = char8_t;
       using traits_type = std::char_traits<value_type>;
@@ -160,8 +175,20 @@ namespace rcx {
     template <typename T> using wrap_ref_t = wrap_ref<T>::type;
   }
 
+  /// Conversion between C++ and Ruby values.
+  ///
   namespace convert {
+    /// Converts a C++ value into a Ruby value.
+    ///
+    /// @tparam T The type of the C++ value.
+    /// @param value The C++ value to be converted.
+    /// @return The converted Ruby value.
     template <typename T> Value into_Value(T value);
+    /// Converts a Ruby value into a C++ value.
+    ///
+    /// @tparam T The type the C++ value.
+    /// @param value The Ruby value to be converted.
+    /// @return The converted C++ value.
     template <typename T> auto from_Value(Value value) -> auto;
 
     template <typename T> struct FromValue {
@@ -230,9 +257,13 @@ namespace rcx {
   using namespace convert;
 
   namespace concepts {
+    /// Specifies the types that can be converted from Ruby values.
+    ///
     template <typename T>
     concept ConvertibleFromValue = requires(Value v) { from_Value<T>(v); };
 
+    /// Specifies the types that can be converted into Ruby values.
+    ///
     template <typename T>
     concept ConvertibleIntoValue = requires(T v) {
       { into_Value<T>(v) } -> std::same_as<Value>;
@@ -257,6 +288,8 @@ namespace rcx {
     };
   }
 
+  /// Argument parsing.
+  ///
   namespace arg {
     template <concepts::ConvertibleFromValue T = Value> struct Self {
       using ResultType = detail::wrap_ref_t<T>;
@@ -293,6 +326,8 @@ namespace rcx {
   }
 
   namespace concepts {
+    /// Specifies the types that can be used as argument specifications.
+    ///
     template <typename T>
     concept ArgSpec = requires(Ruby &ruby, Value self, std::span<Value> &args) {
       typename T::ResultType;
@@ -300,6 +335,8 @@ namespace rcx {
     };
   }
 
+  /// Maps C++ character types to Ruby encodings.
+  ///
   template <typename CharT> struct CharTraits {
     static_assert(detail::always_false_v<CharT>, "Encoding unknown for this character type");
   };
@@ -317,6 +354,8 @@ namespace rcx {
       { T::encoding() } -> std::same_as<rb_encoding *>;
     };
 
+    /// Specifies the character types that can be mapped to Ruby strings.
+    ///
     template <typename T>
     concept CharLike = requires {
       requires CharTraits<::rcx::CharTraits<std::remove_cvref_t<T>>>;
@@ -341,20 +380,40 @@ namespace rcx {
     value::Class ArgumentError();
   };
 
+  /// Literals
+  ///
+  /// This namespace contains C++ user-defined literals to generate Ruby objects.
   namespace literals {
+    /// Creates a mutable `String` in ASCII-8BIT encoding.
+    ///
     template <detail::cxstring> String operator""_str();
+    /// Creates a mutable `String` in UTF-8 encoding.
+    ///
     template <detail::u8cxstring> String operator""_str();
+    /// Creates a frozen `String` in ASCII-8BIT encoding.
+    ///
     template <detail::cxstring> String operator""_fstr();
+    /// Creates a frozen `String` in UTF-8 encoding.
+    ///
     template <detail::u8cxstring> String operator""_fstr();
+    /// Creates a `Symbol` for the name encoded in ASCII/ASCII-8BIT.
+    ///
     template <detail::cxstring> Symbol operator""_sym();
+    /// Creates a `Symbol` for the name encoded in UTF-8.
+    ///
     template <detail::u8cxstring> Symbol operator""_sym();
+    /// Creates an `Id` for the name encoded in ASCII/ASCII-8BIT.
+    ///
     template <detail::cxstring> Id operator""_id();
+    /// Creates an `Id` for the name encoded in UTF-8.
+    ///
     template <detail::u8cxstring> Id operator""_id();
   }
 
   /// Wrapper for static IDs.
   ///
-  /// Static IDs are never garbage-collected and safe to store in the heap.
+  /// Static IDs are never garbage-collected, and it's safe to store anywhere.
+  /// @sa rcx::literals::operator""_id()
   class Id {
     ID id_;
 
@@ -369,26 +428,57 @@ namespace rcx {
   };
 
   namespace value {
+    /// Whether the value wrapper can be nil.
     enum Nilability : bool {
       Nonnil = false,
       Nilable = true,
     };
 
+    /// Base class for all value wrappers.
+    ///
+    /// Use \ref rcx::value::Value instead of this class.
     class ValueBase {
       VALUE value_;
 
     protected:
+      /// Constructs a `ValueBase` from a Ruby value.
+      ///
+      /// @param value The Ruby value to be wrapped.
       constexpr ValueBase(VALUE value);
 
     public:
+      /// Constructs a `ValueBase` from a nil value.
       constexpr ValueBase();
+      /// Unwraps the `VALUE`.
+      ///
+      /// @return The wrapped Ruby `VALUE`.
+      /// @warning This method should be used with caution and only when you have to call Ruby API
+      /// directly.
       constexpr VALUE as_VALUE() const;
+      /// Constructs a `ValueBase` from a coerced value.
+      ///
+      /// @param coerce The coerced value.
+      /// @warning This constructor is unsafe.
       ValueBase(detail::unsafe_coerce<ValueBase> coerce): value_(coerce.value) {
       }
 
+      /// Checks if the wrapped value is nil.
+      ///
+      /// @return Whether the value is nil.
       bool is_nil() const;
+      /// Checks if the wrapped value is frozen.
+      ///
+      /// @return Whether the value is frozen.
       bool is_frozen() const;
+      /// Checks if the wrapped value is an instance of a class.
+      ///
+      /// @param klass The class to check against.
+      /// @return Whether the value is an instance of the class.
       template <typename T> bool is_instance_of(ClassT<T> klass) const;
+      /// Checks if the wrapped value is a kind of a class.
+      ///
+      /// @param klass The class to check against.
+      /// @return Whether the value is a kind of the class.
       template <typename T> bool is_kind_of(ClassT<T> klass) const;
     };
 
@@ -436,94 +526,82 @@ namespace rcx {
       static Value const qundef;
     };
 
+    /// Represents a Ruby module or a class.
+    ///
     class Module: public ValueT<Module, Value> {
     public:
       using ValueT<Module, Value>::ValueT;
 
-      /**
-       * Returns the name path of this module.
-       */
+      /// Returns the name path of this module.
+      ///
+      /// @return The name path of this module.
       String name() const;
 
-      /**
-       * Defines a module under this module.
-       *
-       * @warning Modules defined this way will be never garbage-collected.
-       *
-       * @param name Name of the module.
-       * @return The newly created module.
-       */
+      /// Defines a module under this module.
+      ///
+      /// @warning Modules defined this way will be never garbage-collected.
+      ///
+      /// @param name Name of the module.
+      /// @return The newly defined module.
       Module define_module(concepts::Identifier auto &&name) const;
 
-      /**
-       * Defines a class under this module.
-       *
-       * @warning Classes defined this way will be never garbage-collected.
-       *
-       * @param name Name of the class.
-       * @param superclass The new class will be a subclass of this class.
-       * @return The newly created class.
-       */
+      /// Defines a class under this module.
+      ///
+      /// @warning Classes defined this way will be never garbage-collected.
+      ///
+      /// @param name Name of the class.
+      /// @param superclass The new class will be a subclass of this class.
+      /// @return The newly defined class.
       template <typename T = Value, typename S>
       ClassT<T> define_class(concepts::Identifier auto &&name, ClassT<S> superclass) const;
 
-      /**
-       * Defines a subclass of Object under this module.
-       *
-       * @warning Classes defined this way will be never garbage-collected.
-       *
-       * @param name Name of the class.
-       * @return The newly created class.
-       */
+      /// Defines a subclass of Object under this module.
+      ///
+      /// @warning Classes defined this way will be never garbage-collected.
+      ///
+      /// @param name Name of the class.
+      /// @return The newly created class.
       template <typename T = Value> ClassT<T> define_class(concepts::Identifier auto &&name) const;
 
-      /**
-       * Defines an instance method.
-       *
-       * @warning Defining method this way allocates a resource that is never freeable.
-       *
-       * @tparam Self The type of self.
-       * @param mid The name of the method.
-       * @param argspec List of argument specificatios.
-       * @return Self.
-       */
+      /// Defines an instance method.
+      ///
+      /// @warning Defining method this way allocates a resource that will never be
+      /// garbage-collected.
+      ///
+      /// @tparam Self The type of self.
+      /// @param mid The name of the method.
+      /// @param function The function to be called.
+      /// @param argspec List of argument specifications.
+      /// @return Self.
       template <concepts::ConvertibleFromValue Self = Value, concepts::ArgSpec... ArgSpec>
       Module define_method(concepts::Identifier auto &&mid,
           std::invocable<Self, typename ArgSpec::ResultType...> auto &&function,
           ArgSpec... argspec) const;
 
-      /**
-       * Checks if a constant is defined under this module.
-       *
-       * @param name Name of the constant.
-       * @returns Whether the constant is defined.
-       */
+      /// Checks if a constant is defined under this module.
+      ///
+      /// @param name Name of the constant.
+      /// @returns Whether the constant is defined.
       bool const_defined(concepts::Identifier auto &&name) const;
 
-      /**
-       * Gets the value of a constant under this module.
-       *
-       * @tparam T The type the constant value should be converted into.
-       * @param name Name of the constant.
-       * @return The value covnerted into T.
-       */
+      /// Gets the value of a constant under this module.
+      ///
+      /// @tparam T The type the constant value should be converted into.
+      /// @param name Name of the constant.
+      /// @return The value converted into T.
       template <concepts::ConvertibleFromValue T = Value>
       T const_get(concepts::Identifier auto &&name) const;
 
-      /**
-       * Defines a constant with a value under this module.
-       *
-       * @param name The name of the constant.
-       * @param value The value to be set.
-       */
+      /// Defines a constant with a value under this module.
+      ///
+      /// @param name The name of the constant.
+      /// @param value The value to be set.
       void const_set(
           concepts::Identifier auto &&name, concepts::ConvertibleIntoValue auto &&value) const;
 
-      /**
-       * Creates an anonymous module.
-       *
-       * @return The newly created module.
-       */
+      /// Creates an anonymous module.
+      ///
+      /// @return The newly created module.
       static Module new_module();
     };
 
@@ -714,14 +792,29 @@ namespace rcx {
     template <typename> class DataTypeStorage;
   }
 
+  /// Garbage collection.
   namespace gc {
+    /// Phases of garbage collection.
+    ///
     enum Phase {
       Marking,
       Compaction,
     };
 
     struct Gc {
+      /// Marks an object as movable.
+      ///
+      /// The object will be marked as movable. In the compaction phase, the object may be moved.
+      ///
+      /// @tparam T The type of the object to be marked.
+      /// @param value The object to be marked.
       template <std::derived_from<ValueBase> T> void mark_movable(T &value) const noexcept;
+      /// Marks an object as pinned.
+      ///
+      /// The object will be marked as pinned. The object will not be moved while this reference is
+      /// alive.
+      ///
+      /// @param value The object to be marked.
       void mark_pinned(ValueBase value) const noexcept;
 
     private:
