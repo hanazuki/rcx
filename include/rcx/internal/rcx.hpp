@@ -755,38 +755,61 @@ namespace rcx {
       using ValueT<IOBuffer, Value>::ValueT;
 
       /// Creates an `IO::Buffer` with internal storage.
+      ///
+      /// @param size The size of the buffer.
+      /// @return The newly created buffer.
       static IOBuffer new_internal(size_t size);
       /// Creates an `IO::Buffer` with mapped storage.
+      ///
+      /// @param size The size of the buffer.
+      /// @return The newly created buffer.
       static IOBuffer new_mapped(size_t size);
       /// Creates an `IO::Buffer` with externally managed storage. The returned `IO::Buffer` should
       /// be `free`d when the underlying storage is longer valid.
+      ///
+      /// @param bytes The contiguous memory region to be used as the storage.
+      /// @return The newly created buffer.
       template <size_t N = std::dynamic_extent>
       static IOBuffer new_external(std::span<std::byte, N> bytes [[clang::lifetimebound]]);
       /// Creates an `IO::Buffer` with externally managed read-only storage. The returned
       /// `IO::Buffer` should be `free`d when the underlying storage is longer valid.
+      ///
+      /// @param bytes The contiguous memory region to be used as the storage.
+      /// @return The newly created buffer.
       template <size_t N = std::dynamic_extent>
       static IOBuffer new_external(std::span<std::byte const, N> bytes [[clang::lifetimebound]]);
 
-      /// Frees the internal storage or disassociates the external storage (See the Ruby
-      /// documentation for `IO::Buffer#free`).
+      /// Frees the internal storage or disassociates the external storage.
+      ///
+      /// See the Ruby documentation for `IO::Buffer#free`.
       void free() const;
       /// Resizes the `IO::Buffer` to the given size.
+      ///
+      /// @param size The new size of the buffer.
       void resize(size_t size) const;
 
       /// Returns the bytes of the `IO::Buffer`. This will raise if the `IO::Buffer` is not
       /// writable.
+      ///
+      /// @return The bytes of the `IO::Buffer`.
       std::span<std::byte> bytes() const;
       /// Returns the bytes of the `IO::Buffer` as a read-only span.
+      ///
+      /// @return The bytes of the `IO::Buffer`.
       std::span<std::byte const> cbytes() const;
 
       // BasicLockable
       /// Locks the `IO::Buffer`.
+      ///
       void lock() const;
       /// Unlocks the `IO::Buffer`.
+      ///
       void unlock() const;
 
       // Lockable
       /// Tries to lock the `IO::Buffer`.
+      ///
+      /// @return Whether the lock is successful.
       bool try_lock() const;
     };
 #endif
