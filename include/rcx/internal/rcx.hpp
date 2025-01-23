@@ -375,9 +375,32 @@ namespace rcx {
     value::Class Object();
     ClassT<value::String> String();
     ClassT<value::Array> Array();
+
+    value::Class Exception();
+    value::Class SystemExit();
+    value::Class Interrupt();
+    value::Class SignalException();
+    value::Class StandardError();
     value::Class RuntimeError();
-    value::Class RangeError();
+    value::Class FrozenError();
+    value::Class TypeError();
     value::Class ArgumentError();
+    value::Class IndexError();
+    value::Class KeyError();
+    value::Class RangeError();
+    value::Class NameError();
+    value::Class EncodingError();
+    value::Class EncodingCompatibilityError();
+    value::Class NoMethodError();
+    value::Class SecurityError();
+    value::Class NotImplementedError();
+    value::Class NoMemoryError();
+    value::Class NoMatchingPatternError();
+    value::Class NoMatchingPatternKeyError();
+    value::Class ScriptError();
+    value::Class SyntaxError();
+    value::Class LoadError();
+    value::Class SystemCallError();
   };
 
   /// Literals

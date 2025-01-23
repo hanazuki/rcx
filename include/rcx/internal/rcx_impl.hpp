@@ -502,14 +502,80 @@ namespace rcx {
     inline ClassT<value::String> String() {
       return detail::unsafe_coerce<ClassT<value::String>>(::rb_cString);
     }
+    inline value::Class Exception() {
+      return detail::unsafe_coerce<value::Class>(::rb_eException);
+    }
+    inline value::Class SystemExit() {
+      return detail::unsafe_coerce<value::Class>(::rb_eSystemExit);
+    }
+    inline value::Class Interrupt() {
+      return detail::unsafe_coerce<value::Class>(::rb_eInterrupt);
+    }
+    inline value::Class SignalException() {
+      return detail::unsafe_coerce<value::Class>(::rb_eSignal);
+    }
+    inline value::Class StandardError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eStandardError);
+    }
     inline value::Class RuntimeError() {
       return detail::unsafe_coerce<value::Class>(::rb_eRuntimeError);
+    }
+    inline value::Class FrozenError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eFrozenError);
+    }
+    inline value::Class TypeError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eTypeError);
+    }
+    inline value::Class ArgumentError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eArgError);
+    }
+    inline value::Class IndexError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eIndexError);
+    }
+    inline value::Class KeyError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eKeyError);
     }
     inline value::Class RangeError() {
       return detail::unsafe_coerce<value::Class>(::rb_eRangeError);
     }
-    inline value::Class ArgumentError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eArgError);
+    inline value::Class NameError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eNameError);
+    }
+    inline value::Class EncodingError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eEncodingError);
+    }
+    inline value::Class EncodingCompatibilityError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eEncCompatError);
+    }
+    inline value::Class NoMethodError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eNoMethodError);
+    }
+    inline value::Class SecurityError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eSecurityError);
+    }
+    inline value::Class NotImplementedError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eNotImpError);
+    }
+    inline value::Class NoMemoryError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eNoMemError);
+    }
+    inline value::Class NoMatchingPatternError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternError);
+    }
+    inline value::Class NoMatchingPatternKeyError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternKeyError);
+    }
+    inline value::Class ScriptError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eScriptError);
+    }
+    inline value::Class SyntaxError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eSyntaxError);
+    }
+    inline value::Class LoadError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eLoadError);
+    }
+    inline value::Class SystemCallError() {
+      return detail::unsafe_coerce<value::Class>(::rb_eSystemCallError);
     }
   }
 
