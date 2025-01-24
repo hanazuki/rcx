@@ -543,6 +543,12 @@ namespace rcx {
       bool test() const;
       String inspect() const;
 
+      bool instance_variable_defined(concepts::Identifier auto &&name) const;
+      template <concepts::ConvertibleFromValue T = Value>
+      auto instance_variable_get(concepts::Identifier auto &&name) const -> auto;
+      void instance_variable_set(
+          concepts::Identifier auto &&name, concepts::ConvertibleIntoValue auto &&value) const;
+
       static Value const qnil;
       static Value const qtrue;
       static Value const qfalse;

@@ -141,6 +141,18 @@ Value Test::test_class(Value self) {
   return Value::qtrue;
 }
 
+Value Test::test_ivar(Value self) {
+  using namespace rcx::arg;
+
+  auto cls = Class::new_class()
+                 .define_method(
+                     "initialize", [](Value self, int s) -> void {}, arg<int>)
+                 .define_method("foo",
+                     [](Value self) -> int { return self.instance_variable_get<int>("foo"); });
+
+  return Value::qtrue;
+}
+
 Value Test::test_const(Value self) {
   auto const m = Module::new_module();
 
@@ -371,6 +383,7 @@ extern "C" void Init_test() {
                    .define_method("test_primitive", &Test::test_primitive)
                    .define_method("test_string", &Test::test_string)
                    .define_method("test_class", &Test::test_class)
+                   .define_method("test_ivar", &Test::test_ivar)
                    .define_method("test_const", &Test::test_const)
                    .define_method("test_singleton_method", &Test::test_singleton_method)
                    .define_method("test_pinning", &Test::test_pinning)

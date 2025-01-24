@@ -192,6 +192,13 @@ namespace rcx {
       }
     }
 
+    // Calculate the default type of the self parameter for the methods of ClassT<T>.
+    template <concepts::ConvertibleFromValue T>
+    using self_type =
+        std::conditional_t<std::derived_from<T, typed_data::WrappedStructBase>, T &, T>;
+    template <concepts::ConvertibleFromValue T>
+    using self_type_const =
+        std::conditional_t<std::derived_from<T, typed_data::WrappedStructBase>, T const &, T const>;
   };
 
   namespace arg {
@@ -658,6 +665,28 @@ namespace rcx {
           detail::protect([&] { return ::rb_inspect(as_VALUE()); }));
     }
 
+    inline bool Value::instance_variable_defined(concepts::Identifier auto &&name) const {
+      return detail::protect([&] {
+        return ::rb_ivar_defined(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
+      });
+    }
+
+    template <concepts::ConvertibleFromValue T>
+    inline auto Value::instance_variable_get(concepts::Identifier auto &&name) const -> auto {
+      return from_Value<T>(detail::unsafe_coerce<Value>(detail::protect([&] {
+        return ::rb_ivar_get(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
+      })));
+    }
+
+    inline void Value::instance_variable_set(
+        concepts::Identifier auto &&name, concepts::ConvertibleIntoValue auto &&value) const {
+      auto const v = into_Value(std::forward<decltype(value)>(value));
+      return detail::protect([&] {
+        ::rb_ivar_set(
+            as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)), v.as_VALUE());
+      });
+    }
+
     inline Value const Value::qnil = {RUBY_Qnil};
     inline Value const Value::qtrue = {RUBY_Qtrue};
     inline Value const Value::qfalse = {RUBY_Qfalse};
@@ -758,8 +787,9 @@ namespace rcx {
     template <concepts::ArgSpec... ArgSpec>
     inline ClassT<T> ClassT<T>::define_method(concepts::Identifier auto &&mid,
         std::invocable<T &, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
-      auto const callback = detail::method_callback<arg::Self<T &>, ArgSpec...>::alloc(
-          std::forward<decltype(function)>(function));
+      auto const callback =
+          detail::method_callback<arg::Self<detail::self_type<T>>, ArgSpec...>::alloc(
+              std::forward<decltype(function)>(function));
       detail::protect([&]() {
         rb_define_method_id(
             this->as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
@@ -773,7 +803,8 @@ namespace rcx {
         std::invocable<T const &, typename ArgSpec::ResultType...> auto &&function,
         ArgSpec...) const {
       auto const callback =
-          detail::method_callback<arg::Self<T const &>, ArgSpec...>::alloc(function);
+          detail::method_callback<arg::Self<detail::self_type_const<T>>, ArgSpec...>::alloc(
+              function);
       detail::protect([&] {
         rb_define_method_id(
             this->as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);

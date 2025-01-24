@@ -21,6 +21,7 @@ struct Test {
   static Value test_primitive(Value self);
   static Value test_string(Value self);
   static Value test_class(Value self);
+  static Value test_ivar(Value self);
   static Value test_const(Value self);
   static Value test_singleton_method(Value self);
   static Value test_array(Value self);
