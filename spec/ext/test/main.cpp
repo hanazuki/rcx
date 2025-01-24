@@ -13,6 +13,7 @@
 #include "assert.hpp"
 #include "rcx/internal/rcx.hpp"
 
+using namespace std::literals;
 using namespace rcx::value;
 using namespace rcx::literals;
 
@@ -315,6 +316,16 @@ Value Test::test_io_buffer([[maybe_unused]] Value self) {
   return Value::qtrue;
 }
 
+Value Test::test_format([[maybe_unused]] Value self) {
+  {
+    auto v = String::copy_from("test");
+    ASSERT_EQ("<test>"sv, std::format("<{}>", v));
+    ASSERT_EQ("<\"test\">"sv, std::format("<{:#}>", v));
+  }
+
+  return Value::qtrue;
+}
+
 Base::Base(String string): string_(std::string_view(string)) {
 }
 
@@ -388,7 +399,8 @@ extern "C" void Init_test() {
                    .define_method("test_singleton_method", &Test::test_singleton_method)
                    .define_method("test_pinning", &Test::test_pinning)
                    .define_method("test_allocate", &Test::test_allocate)
-                   .define_method("test_io_buffer", &Test::test_io_buffer);
+                   .define_method("test_io_buffer", &Test::test_io_buffer)
+                   .define_method("test_format", &Test::test_format);
 
   cBase = ruby.define_class<Base>("Base")
               .define_constructor(arg<String, "string">)

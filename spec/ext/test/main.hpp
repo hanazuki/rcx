@@ -28,6 +28,7 @@ struct Test {
   static Value test_pinning(Value self);
   static Value test_allocate(Value self);
   static Value test_io_buffer(Value self);
+  static Value test_format(Value self);
 };
 
 class Base: public WrappedStruct<> {

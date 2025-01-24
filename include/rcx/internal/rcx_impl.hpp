@@ -665,6 +665,11 @@ namespace rcx {
           detail::protect([&] { return ::rb_inspect(as_VALUE()); }));
     }
 
+    inline String Value::to_string() const {
+      return detail::unsafe_coerce<String>(
+          detail::protect([&] { return ::rb_obj_as_string(as_VALUE()); }));
+    }
+
     inline bool Value::instance_variable_defined(concepts::Identifier auto &&name) const {
       return detail::protect([&] {
         return ::rb_ivar_defined(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
@@ -1334,5 +1339,31 @@ namespace rcx {
         }
       }
     }
+  }
+}
+
+namespace std {
+  template <std::derived_from<rcx::Value> T>
+  template <typename ParseContext>
+  constexpr ParseContext::iterator formatter<T, char>::parse(ParseContext &ctx) {
+    auto it = ctx.begin();
+    if(it == ctx.end()) {
+      return it;
+    }
+    if(*it == '#') {
+      inspect = true;
+      ++it;
+    }
+    if(it == ctx.end() || *it != '}') {
+      throw std::format_error("Invalid format args for std::formatter<ValueBase>.");
+    }
+    return it;
+  }
+
+  template <std::derived_from<rcx::Value> T>
+  template <typename FormatContext>
+  FormatContext::iterator formatter<T, char>::format(T value, FormatContext &ctx) const {
+    return std::format_to(ctx.out(), "{}",
+        static_cast<std::string_view>(inspect ? value.inspect() : value.to_string()));
   }
 }

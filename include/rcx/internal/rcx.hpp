@@ -541,7 +541,16 @@ namespace rcx {
       R send(concepts::Identifier auto &&mid, concepts::ConvertibleIntoValue auto &&...args) const;
 
       bool test() const;
+
+      /// Converts the object into a String using its `#inspect` method.
+      ///
+      /// @return The converted string.
       String inspect() const;
+
+      /// Converts the object into a String using its `#to_s` method.
+      ///
+      /// @return The converted string.
+      String to_string() const;
 
       bool instance_variable_defined(concepts::Identifier auto &&name) const;
       template <concepts::ConvertibleFromValue T = Value>
@@ -1024,4 +1033,14 @@ namespace rcx {
       return unsafe_ruby();
     }
   }
+}
+
+namespace std {
+  template <std::derived_from<rcx::Value> T> struct formatter<T, char> {
+    bool inspect = false;
+
+    template <typename ParseContext> constexpr ParseContext::iterator parse(ParseContext &ctx);
+    template <typename FormatContext>
+    FormatContext::iterator format(T value, FormatContext &ctx) const;
+  };
 }
