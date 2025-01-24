@@ -273,7 +273,7 @@ namespace rcx {
       int const v = NUM2INT(value.as_VALUE());
       signed char const r = static_cast<signed char>(v);
       if(v != static_cast<int>(r)) {
-        throw RubyError::format(builtin::RangeError(),
+        throw RubyError::format(builtin::RangeError,
             "integer {} too {} to convert to 'signed char'", v, v < 0 ? "small" : "big");
       }
       return r;
@@ -286,7 +286,7 @@ namespace rcx {
       int const v = NUM2INT(value.as_VALUE());
       unsigned char const r = static_cast<unsigned char>(v);
       if(v != static_cast<int>(r)) {
-        throw RubyError::format(builtin::RangeError(),
+        throw RubyError::format(builtin::RangeError,
             "integer {} too {} to convert to 'unsigned char'", v, v < 0 ? "small" : "big");
       }
       return r;
@@ -485,107 +485,6 @@ namespace rcx {
     return id_;
   }
 
-  /// Built-ins
-
-  namespace builtin {
-    inline value::Class NilClass() {
-      return detail::unsafe_coerce<value::Class>(::rb_cNilClass);
-    }
-    inline value::Class TrueClass() {
-      return detail::unsafe_coerce<value::Class>(::rb_cTrueClass);
-    }
-    inline value::Class FalseClass() {
-      return detail::unsafe_coerce<value::Class>(::rb_cFalseClass);
-    }
-    inline ClassT<value::Module> Module() {
-      return detail::unsafe_coerce<ClassT<value::Module>>(::rb_cModule);
-    }
-    inline ClassT<value::Class> Class() {
-      return detail::unsafe_coerce<ClassT<value::Class>>(::rb_cClass);
-    }
-    inline value::Class Object() {
-      return detail::unsafe_coerce<value::Class>(::rb_cObject);
-    }
-    inline ClassT<value::String> String() {
-      return detail::unsafe_coerce<ClassT<value::String>>(::rb_cString);
-    }
-    inline value::Class Exception() {
-      return detail::unsafe_coerce<value::Class>(::rb_eException);
-    }
-    inline value::Class SystemExit() {
-      return detail::unsafe_coerce<value::Class>(::rb_eSystemExit);
-    }
-    inline value::Class Interrupt() {
-      return detail::unsafe_coerce<value::Class>(::rb_eInterrupt);
-    }
-    inline value::Class SignalException() {
-      return detail::unsafe_coerce<value::Class>(::rb_eSignal);
-    }
-    inline value::Class StandardError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eStandardError);
-    }
-    inline value::Class RuntimeError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eRuntimeError);
-    }
-    inline value::Class FrozenError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eFrozenError);
-    }
-    inline value::Class TypeError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eTypeError);
-    }
-    inline value::Class ArgumentError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eArgError);
-    }
-    inline value::Class IndexError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eIndexError);
-    }
-    inline value::Class KeyError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eKeyError);
-    }
-    inline value::Class RangeError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eRangeError);
-    }
-    inline value::Class NameError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eNameError);
-    }
-    inline value::Class EncodingError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eEncodingError);
-    }
-    inline value::Class EncodingCompatibilityError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eEncCompatError);
-    }
-    inline value::Class NoMethodError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eNoMethodError);
-    }
-    inline value::Class SecurityError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eSecurityError);
-    }
-    inline value::Class NotImplementedError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eNotImpError);
-    }
-    inline value::Class NoMemoryError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eNoMemError);
-    }
-    inline value::Class NoMatchingPatternError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternError);
-    }
-    inline value::Class NoMatchingPatternKeyError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternKeyError);
-    }
-    inline value::Class ScriptError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eScriptError);
-    }
-    inline value::Class SyntaxError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eSyntaxError);
-    }
-    inline value::Class LoadError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eLoadError);
-    }
-    inline value::Class SystemCallError() {
-      return detail::unsafe_coerce<value::Class>(::rb_eSystemCallError);
-    }
-  }
-
   namespace value {
     /// ValueBase
 
@@ -722,7 +621,7 @@ namespace rcx {
 
     template <typename T>
     inline ClassT<T> Module::define_class(concepts::Identifier auto &&name) const {
-      return define_class<T>(std::forward<decltype(name)>(name), builtin::Object());
+      return define_class<T>(std::forward<decltype(name)>(name), builtin::Object);
     }
 
     template <concepts::ConvertibleFromValue Self, concepts::ArgSpec... ArgSpec>
@@ -844,7 +743,7 @@ namespace rcx {
     }
 
     template <typename T> inline Class ClassT<T>::new_class() {
-      return new_class(builtin::Object());
+      return new_class(builtin::Object);
     }
     template <typename T>
     template <typename S>
@@ -1204,7 +1103,7 @@ namespace rcx {
     auto array = from_Value<Array>(value);
     if(array.size() != sizeof...(T)) {
       throw RubyError::format(
-          builtin::ArgumentError(), "Array of length {} is expected", sizeof...(T));
+          builtin::ArgumentError, "Array of length {} is expected", sizeof...(T));
     }
     return [array]<size_t... I>(std::index_sequence<I...>) {
       return std::make_tuple(array.at<T>(I)...);
@@ -1272,16 +1171,16 @@ namespace rcx {
   /// Ruby
 
   inline Module Ruby::define_module(concepts::Identifier auto &&name) {
-    return builtin::Object().define_module(std::forward<decltype(name)>(name));
+    return builtin::Object.define_module(std::forward<decltype(name)>(name));
   }
 
   template <typename T, typename S>
   inline ClassT<T> Ruby::define_class(concepts::Identifier auto &&name, ClassT<S> superclass) {
-    return builtin::Object().define_class<T>(std::forward<decltype(name)>(name), superclass);
+    return builtin::Object.define_class<T>(std::forward<decltype(name)>(name), superclass);
   }
 
   template <typename T> inline ClassT<T> Ruby::define_class(concepts::Identifier auto &&name) {
-    return define_class<T>(std::forward<decltype(name)>(name), builtin::Object());
+    return define_class<T>(std::forward<decltype(name)>(name), builtin::Object);
   }
 
   inline RubyError::RubyError(Value exception) noexcept: exception_(exception) {
@@ -1316,7 +1215,7 @@ namespace rcx {
         name = demangle_type_info(*ti);
       if(exc)
         msg = exc->what();
-      return builtin::RuntimeError().new_instance(String::copy_from(
+      return builtin::RuntimeError.new_instance(String::copy_from(
           std::format("{}: {}", name.empty() ? std::string{"unknown"} : name, msg)));
     }
 

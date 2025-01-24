@@ -23,7 +23,7 @@ static std::optional<ClassT<Derived>> cDerived;
 Value Test::test_nil(Value self) {
   self.send("assert_nil", Value{});
   self.send("assert_nil", Value::qnil);
-  self.send("assert_kind_of", rcx::builtin::Object(), Value::qnil);
+  self.send("assert_kind_of", rcx::builtin::Object, Value::qnil);
 
   return Value::qtrue;
 }
@@ -78,7 +78,7 @@ Value Test::test_string(Value self) {
 
   {
     auto lit = "test"_str;
-    self.send("assert_kind_of", rcx::builtin::String(), lit);
+    self.send("assert_kind_of", rcx::builtin::String, lit);
     self.send("assert_equal", test, lit);
     self.send("assert_equal", 4, lit.size());
   }
@@ -113,7 +113,7 @@ Value Test::test_string(Value self) {
 
   {
     auto flit = "test"_fstr;
-    self.send("assert_kind_of", rcx::builtin::String(), flit);
+    self.send("assert_kind_of", rcx::builtin::String, flit);
     self.send("assert_equal", test, flit);
     self.send("assert_send", "test"_fstr, "frozen?"_sym);
   }
@@ -126,18 +126,18 @@ Value Test::test_class(Value self) {
   auto const c1 = Class::new_class();
   auto const c2 = Class::new_class(c1);
 
-  self.send("assert_kind_of", rcx::builtin::Module(), m);
-  self.send("assert_kind_of", rcx::builtin::Class(), c1);
-  self.send("assert_kind_of", rcx::builtin::Class(), c2);
+  self.send("assert_kind_of", rcx::builtin::Module, m);
+  self.send("assert_kind_of", rcx::builtin::Class, c1);
+  self.send("assert_kind_of", rcx::builtin::Class, c2);
   self.send("assert_send", c2, "<"_sym, c1);
   self.send("assert_send", c1, ">"_sym, c2);
 
-  self.send("assert_equal", rcx::builtin::String(), ""_str.get_class());
-  self.send("assert_equal", rcx::builtin::Module(), m.get_class());
+  self.send("assert_equal", rcx::builtin::String, ""_str.get_class());
+  self.send("assert_equal", rcx::builtin::Module, m.get_class());
 
-  auto const cs = Class::new_class(rcx::builtin::String());
+  auto const cs = Class::new_class(rcx::builtin::String);
   String const s = cs.new_instance();
-  self.send("assert_kind_of", rcx::builtin::String(), s);
+  self.send("assert_kind_of", rcx::builtin::String, s);
 
   return Value::qtrue;
 }

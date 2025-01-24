@@ -8,8 +8,7 @@ using namespace rcx::value;
 using namespace rcx::typed_data;
 
 inline VALUE rb_eExpectationNotMetError() {
-  static auto v = rcx::builtin::Object()
-                      .const_get<Module>("RSpec")
+  static auto v = rcx::builtin::Object.const_get<Module>("RSpec")
                       .const_get<Module>("Expectations")
                       .const_get<Class>("ExpectationNotMetError");
 

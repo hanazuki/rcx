@@ -88,10 +88,11 @@ namespace rcx {
     template <typename T> struct unsafe_coerce {
       VALUE value;
 
-      unsafe_coerce(VALUE value): value{value} {
+      constexpr unsafe_coerce(VALUE value): value{value} {
       }
 
-      template <std::derived_from<T> U> unsafe_coerce(unsafe_coerce<U> other): value{other.value} {
+      template <std::derived_from<T> U>
+      constexpr unsafe_coerce(unsafe_coerce<U> other): value{other.value} {
       }
     };
 
@@ -363,46 +364,6 @@ namespace rcx {
     };
   };
 
-  /**
-   * Built-in classes.
-   */
-  namespace builtin {
-    value::Class NilClass();
-    value::Class TrueClass();
-    value::Class FalseClass();
-    ClassT<value::Class> Class();
-    ClassT<value::Module> Module();
-    value::Class Object();
-    ClassT<value::String> String();
-    ClassT<value::Array> Array();
-
-    value::Class Exception();
-    value::Class SystemExit();
-    value::Class Interrupt();
-    value::Class SignalException();
-    value::Class StandardError();
-    value::Class RuntimeError();
-    value::Class FrozenError();
-    value::Class TypeError();
-    value::Class ArgumentError();
-    value::Class IndexError();
-    value::Class KeyError();
-    value::Class RangeError();
-    value::Class NameError();
-    value::Class EncodingError();
-    value::Class EncodingCompatibilityError();
-    value::Class NoMethodError();
-    value::Class SecurityError();
-    value::Class NotImplementedError();
-    value::Class NoMemoryError();
-    value::Class NoMatchingPatternError();
-    value::Class NoMatchingPatternKeyError();
-    value::Class ScriptError();
-    value::Class SyntaxError();
-    value::Class LoadError();
-    value::Class SystemCallError();
-  };
-
   /// Literals
   ///
   /// This namespace contains C++ user-defined literals to generate Ruby objects.
@@ -517,7 +478,7 @@ namespace rcx {
 
       template <std::derived_from<Derived> T> ValueT(T const &value): Super(value.as_VALUE()) {
       }
-      ValueT(detail::unsafe_coerce<Derived> coerce): Super(coerce) {
+      constexpr ValueT(detail::unsafe_coerce<Derived> coerce): Super(coerce) {
       }
       Derived &operator=(Derived const &other) {
         Super::operator=(other);
@@ -884,6 +845,182 @@ namespace rcx {
     template <std::derived_from<ValueBase> T> PinnedOpt(T) -> PinnedOpt<T>;
     template <std::derived_from<ValueBase> T> Pinned(T) -> Pinned<T>;
   }
+
+  /// Built-in classes.
+  ///
+  namespace builtin {
+    /// `NilClass` class
+    ///
+    inline value::Class const NilClass = detail::unsafe_coerce<value::Class>(::rb_cNilClass);
+    /// `TrueClass` class
+    ///
+    inline value::Class const TrueClass = detail::unsafe_coerce<value::Class>(::rb_cTrueClass);
+    /// `FalseClass` class
+    ///
+    inline value::Class const FalseClass = detail::unsafe_coerce<value::Class>(::rb_cFalseClass);
+    /// `Class` class
+    ///
+    inline ClassT<value::Class> const Class =
+        detail::unsafe_coerce<ClassT<value::Class>>(::rb_cClass);
+    /// `Module` class
+    ///
+    inline ClassT<value::Module> const Module =
+        detail::unsafe_coerce<ClassT<value::Module>>(::rb_cModule);
+    /// `BasicObject` class
+    ///
+    inline value::Class const BasicObject = detail::unsafe_coerce<value::Class>(::rb_cBasicObject);
+    /// `Object` class
+    ///
+    inline value::Class const Object = detail::unsafe_coerce<value::Class>(::rb_cObject);
+    /// `String` class
+    ///
+    inline ClassT<value::String> const String =
+        detail::unsafe_coerce<ClassT<value::String>>(::rb_cString);
+    /// `Encoding` class
+    ///
+    inline value::Class const Encoding = detail::unsafe_coerce<value::Class>(::rb_cEncoding);
+    /// `Symbol` class
+    ///
+    inline value::Class const Symbol = detail::unsafe_coerce<value::Class>(::rb_cSymbol);
+    /// `Regexp` class
+    ///
+    inline value::Class const Regexp = detail::unsafe_coerce<value::Class>(::rb_cRegexp);
+    /// `MatchData` class
+    ///
+    inline value::Class const MatchData = detail::unsafe_coerce<value::Class>(::rb_cMatch);
+    /// `Array` class
+    ///
+    inline ClassT<value::Array> const Array =
+        detail::unsafe_coerce<ClassT<value::Array>>(::rb_cArray);
+    /// `Hash` class
+    ///
+    inline value::Class const Hash = detail::unsafe_coerce<value::Class>(::rb_cHash);
+    /// `Proc` class
+    ///
+    inline ClassT<value::Proc> const Proc = detail::unsafe_coerce<ClassT<value::Proc>>(::rb_cProc);
+    /// `Method` class
+    ///
+    inline value::Class const Method = detail::unsafe_coerce<value::Class>(::rb_cMethod);
+    /// `Numeric` class
+    ///
+    inline value::Class const Numeric = detail::unsafe_coerce<value::Class>(::rb_cNumeric);
+    /// `Integer` class
+    ///
+    inline value::Class const Integer = detail::unsafe_coerce<value::Class>(::rb_cInteger);
+    /// `Float` class
+    ///
+    inline value::Class const Float = detail::unsafe_coerce<value::Class>(::rb_cFloat);
+    /// `Rational` class
+    ///
+    inline value::Class const Rational = detail::unsafe_coerce<value::Class>(::rb_cRational);
+    /// `Complex` class
+    ///
+    inline value::Class const Complex = detail::unsafe_coerce<value::Class>(::rb_cComplex);
+    /// `Range` class
+    ///
+    inline value::Class const Range = detail::unsafe_coerce<value::Class>(::rb_cRange);
+    /// `IO` class
+    ///
+    inline value::Class const IO = detail::unsafe_coerce<value::Class>(::rb_cIO);
+    /// `File` class
+    ///
+    inline value::Class const File = detail::unsafe_coerce<value::Class>(::rb_cFile);
+    /// `Thread` class
+    ///
+    inline value::Class const Thread = detail::unsafe_coerce<value::Class>(::rb_cThread);
+
+    /// `Exception` class
+    ///
+    inline value::Class const Exception = detail::unsafe_coerce<value::Class>(::rb_eException);
+    /// `SystemExit` class
+    ///
+    inline value::Class const SystemExit = detail::unsafe_coerce<value::Class>(::rb_eSystemExit);
+    /// `Interrupt` class
+    ///
+    inline value::Class const Interrupt = detail::unsafe_coerce<value::Class>(::rb_eInterrupt);
+    /// `SignalException` class
+    ///
+    inline value::Class const SignalException = detail::unsafe_coerce<value::Class>(::rb_eSignal);
+    /// `StandardError` class
+    ///
+    inline value::Class const StandardError =
+        detail::unsafe_coerce<value::Class>(::rb_eStandardError);
+    /// `RuntimeError` class
+    ///
+    inline value::Class const RuntimeError =
+        detail::unsafe_coerce<value::Class>(::rb_eRuntimeError);
+    /// `FrozenError` class
+    ///
+    inline value::Class const FrozenError = detail::unsafe_coerce<value::Class>(::rb_eFrozenError);
+    /// `TypeError` class
+    ///
+    inline value::Class const TypeError = detail::unsafe_coerce<value::Class>(::rb_eTypeError);
+    /// `ArgumentError` class
+    ///
+    inline value::Class const ArgumentError = detail::unsafe_coerce<value::Class>(::rb_eArgError);
+    /// `IndexError` class
+    ///
+    inline value::Class const IndexError = detail::unsafe_coerce<value::Class>(::rb_eIndexError);
+    /// `KeyError` class
+    ///
+    inline value::Class const KeyError = detail::unsafe_coerce<value::Class>(::rb_eKeyError);
+    /// `RangeError` class
+    ///
+    inline value::Class const RangeError = detail::unsafe_coerce<value::Class>(::rb_eRangeError);
+    /// `NameError` class
+    ///
+    inline value::Class const NameError = detail::unsafe_coerce<value::Class>(::rb_eNameError);
+    /// `EncodingError` class
+    ///
+    inline value::Class const EncodingError =
+        detail::unsafe_coerce<value::Class>(::rb_eEncodingError);
+    /// `Encoding::CompatibilityError` class
+    ///
+    inline value::Class const EncodingCompatibilityError =
+        detail::unsafe_coerce<value::Class>(::rb_eEncCompatError);
+    /// `NoMethodError` class
+    ///
+    inline value::Class const NoMethodError =
+        detail::unsafe_coerce<value::Class>(::rb_eNoMethodError);
+    /// `SecurityError` class
+    ///
+    inline value::Class const SecurityError =
+        detail::unsafe_coerce<value::Class>(::rb_eSecurityError);
+    /// `NotImplementedError` class
+    ///
+    inline value::Class const NotImplementedError =
+        detail::unsafe_coerce<value::Class>(::rb_eNotImpError);
+    /// `NoMemoryError` class
+    ///
+    inline value::Class const NoMemoryError = detail::unsafe_coerce<value::Class>(::rb_eNoMemError);
+    /// `NoMatchingPatternError` class
+    ///
+    inline value::Class const NoMatchingPatternError =
+        detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternError);
+    /// `NoMatchingPatternKeyError` class
+    ///
+    inline value::Class const NoMatchingPatternKeyError =
+        detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternKeyError);
+    /// `ScriptError` class
+    ///
+    inline value::Class const ScriptError = detail::unsafe_coerce<value::Class>(::rb_eScriptError);
+    /// `SyntaxError` class
+    ///
+    inline value::Class const SyntaxError = detail::unsafe_coerce<value::Class>(::rb_eSyntaxError);
+    /// `LoadError` class
+    ///
+    inline value::Class const LoadError = detail::unsafe_coerce<value::Class>(::rb_eLoadError);
+    /// `SystemCallError` class
+    ///
+    inline value::Class const SystemCallError =
+        detail::unsafe_coerce<value::Class>(::rb_eSystemCallError);
+
+#ifdef RCX_IO_BUFFER
+    /// `IO::Buffer` class
+    ///
+    inline value::Class const IOBuffer = detail::unsafe_coerce<value::Class>(::rb_cIOBuffer);
+#endif
+  };
 
   namespace typed_data {
     template <typename> class DataTypeStorage;
