@@ -55,6 +55,7 @@ namespace rcx {
     class Proc;
     class String;
     class Array;
+    class Exception;
 #ifdef RCX_IO_BUFFER
     class IOBuffer;
 #endif
@@ -221,39 +222,55 @@ namespace rcx {
     RCX_DECLARE_CONV(double);
 
 #undef RCX_DECLARE_CONV
+    template <> struct FromValue<std::string_view> {
+      std::string_view convert(Value value);
+    };
 
     template <> struct FromValue<Module> {
       Module convert(Value value);
     };
 
-    template <typename T> struct FromValue<ClassT<T>> {
-      ClassT<T> convert(Value value);
+    template <> struct FromValue<Class> {
+      Class convert(Value value);
     };
-
     template <> struct FromValue<Symbol> {
       Symbol convert(Value value);
     };
-
     template <> struct FromValue<Proc> {
       Proc convert(Value value);
     };
-
     template <> struct FromValue<String> {
       String convert(Value value);
     };
-    template <> struct FromValue<std::string_view> {
-      std::string_view convert(Value value);
-    };
-
     template <> struct FromValue<Array> {
       Array convert(Value value);
     };
-
+    template <> struct FromValue<Exception> {
+      Exception convert(Value value);
+    };
 #ifdef RCX_IO_BUFFER
     template <> struct FromValue<IOBuffer> {
       IOBuffer convert(Value value);
     };
 #endif
+
+#define RCX_DECLARE_CLASS_CONV(CLS)                                                                \
+  template <> struct FromValue<ClassT<CLS>> {                                                      \
+    ClassT<CLS> convert(Value value);                                                              \
+  };
+
+    RCX_DECLARE_CLASS_CONV(Module);
+    RCX_DECLARE_CLASS_CONV(Class);
+    RCX_DECLARE_CLASS_CONV(Symbol);
+    RCX_DECLARE_CLASS_CONV(Proc);
+    RCX_DECLARE_CLASS_CONV(String);
+    RCX_DECLARE_CLASS_CONV(Array);
+    RCX_DECLARE_CLASS_CONV(Exception);
+#ifdef RCX_IO_BUFFER
+    RCX_DECLARE_CLASS_CONV(IOBuffer);
+#endif
+
+#undef RCX_DECLARE_CLASS_CONV
   }
   using namespace convert;
 
@@ -621,6 +638,17 @@ namespace rcx {
       /// @returns The newly allocated uninitialized object.
       Value allocate() const;
 
+      /// Checks if this class is a subclass of another class.
+      ///
+      /// @param klass The class to check against.
+      /// @return Whether this class is a subclass of the given class.
+      template <typename S> bool is_subclass_of(ClassT<S> klass) const;
+      /// Checks if this class is a superclass of another class.
+      ///
+      /// @param klass The class to check against.
+      /// @return Whether this class is a superclass of the given class.
+      template <typename S> bool is_superclass_of(ClassT<S> klass) const;
+
       /// Defines a mutating instance method.
       ///
       /// The method will raise a `FrozenError` if the object is frozen.
@@ -745,6 +773,14 @@ namespace rcx {
 
       bool is_lambda() const;
       Value call(Array args) const;
+    };
+
+    class Exception: public ValueT<Exception, Value> {
+    public:
+      using ValueT<Exception, Value>::ValueT;
+
+      template <std::derived_from<Exception> E, typename... Args>
+      static E format(ClassT<E> cls, std::format_string<Args...> fmt, Args &&...args);
     };
 
 #ifdef RCX_IO_BUFFER
@@ -931,89 +967,104 @@ namespace rcx {
 
     /// `Exception` class
     ///
-    inline value::Class const Exception = detail::unsafe_coerce<value::Class>(::rb_eException);
+    inline value::ClassT<value::Exception> const Exception =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eException);
     /// `SystemExit` class
     ///
-    inline value::Class const SystemExit = detail::unsafe_coerce<value::Class>(::rb_eSystemExit);
+    inline value::ClassT<value::Exception> const SystemExit =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSystemExit);
     /// `Interrupt` class
     ///
-    inline value::Class const Interrupt = detail::unsafe_coerce<value::Class>(::rb_eInterrupt);
+    inline value::ClassT<value::Exception> const Interrupt =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eInterrupt);
     /// `SignalException` class
     ///
-    inline value::Class const SignalException = detail::unsafe_coerce<value::Class>(::rb_eSignal);
+    inline value::ClassT<value::Exception> const SignalException =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSignal);
     /// `StandardError` class
     ///
-    inline value::Class const StandardError =
-        detail::unsafe_coerce<value::Class>(::rb_eStandardError);
+    inline value::ClassT<value::Exception> const StandardError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eStandardError);
     /// `RuntimeError` class
     ///
-    inline value::Class const RuntimeError =
-        detail::unsafe_coerce<value::Class>(::rb_eRuntimeError);
+    inline value::ClassT<value::Exception> const RuntimeError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eRuntimeError);
     /// `FrozenError` class
     ///
-    inline value::Class const FrozenError = detail::unsafe_coerce<value::Class>(::rb_eFrozenError);
+    inline value::ClassT<value::Exception> const FrozenError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eFrozenError);
     /// `TypeError` class
     ///
-    inline value::Class const TypeError = detail::unsafe_coerce<value::Class>(::rb_eTypeError);
+    inline value::ClassT<value::Exception> const TypeError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eTypeError);
     /// `ArgumentError` class
     ///
-    inline value::Class const ArgumentError = detail::unsafe_coerce<value::Class>(::rb_eArgError);
+    inline value::ClassT<value::Exception> const ArgumentError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eArgError);
     /// `IndexError` class
     ///
-    inline value::Class const IndexError = detail::unsafe_coerce<value::Class>(::rb_eIndexError);
+    inline value::ClassT<value::Exception> const IndexError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eIndexError);
     /// `KeyError` class
     ///
-    inline value::Class const KeyError = detail::unsafe_coerce<value::Class>(::rb_eKeyError);
+    inline value::ClassT<value::Exception> const KeyError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eKeyError);
     /// `RangeError` class
     ///
-    inline value::Class const RangeError = detail::unsafe_coerce<value::Class>(::rb_eRangeError);
+    inline value::ClassT<value::Exception> const RangeError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eRangeError);
     /// `NameError` class
     ///
-    inline value::Class const NameError = detail::unsafe_coerce<value::Class>(::rb_eNameError);
+    inline value::ClassT<value::Exception> const NameError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNameError);
     /// `EncodingError` class
     ///
-    inline value::Class const EncodingError =
-        detail::unsafe_coerce<value::Class>(::rb_eEncodingError);
+    inline value::ClassT<value::Exception> const EncodingError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEncodingError);
     /// `Encoding::CompatibilityError` class
     ///
-    inline value::Class const EncodingCompatibilityError =
-        detail::unsafe_coerce<value::Class>(::rb_eEncCompatError);
+    inline value::ClassT<value::Exception> const EncodingCompatibilityError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEncCompatError);
     /// `NoMethodError` class
     ///
-    inline value::Class const NoMethodError =
-        detail::unsafe_coerce<value::Class>(::rb_eNoMethodError);
+    inline value::ClassT<value::Exception> const NoMethodError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMethodError);
     /// `SecurityError` class
     ///
-    inline value::Class const SecurityError =
-        detail::unsafe_coerce<value::Class>(::rb_eSecurityError);
+    inline value::ClassT<value::Exception> const SecurityError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSecurityError);
     /// `NotImplementedError` class
     ///
-    inline value::Class const NotImplementedError =
-        detail::unsafe_coerce<value::Class>(::rb_eNotImpError);
+    inline value::ClassT<value::Exception> const NotImplementedError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNotImpError);
     /// `NoMemoryError` class
     ///
-    inline value::Class const NoMemoryError = detail::unsafe_coerce<value::Class>(::rb_eNoMemError);
+    inline value::ClassT<value::Exception> const NoMemoryError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMemError);
     /// `NoMatchingPatternError` class
     ///
-    inline value::Class const NoMatchingPatternError =
-        detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternError);
+    inline value::ClassT<value::Exception> const NoMatchingPatternError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMatchingPatternError);
     /// `NoMatchingPatternKeyError` class
     ///
-    inline value::Class const NoMatchingPatternKeyError =
-        detail::unsafe_coerce<value::Class>(::rb_eNoMatchingPatternKeyError);
+    inline value::ClassT<value::Exception> const NoMatchingPatternKeyError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMatchingPatternKeyError);
     /// `ScriptError` class
     ///
-    inline value::Class const ScriptError = detail::unsafe_coerce<value::Class>(::rb_eScriptError);
+    inline value::ClassT<value::Exception> const ScriptError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eScriptError);
     /// `SyntaxError` class
     ///
-    inline value::Class const SyntaxError = detail::unsafe_coerce<value::Class>(::rb_eSyntaxError);
+    inline value::ClassT<value::Exception> const SyntaxError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSyntaxError);
     /// `LoadError` class
     ///
-    inline value::Class const LoadError = detail::unsafe_coerce<value::Class>(::rb_eLoadError);
+    inline value::ClassT<value::Exception> const LoadError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eLoadError);
     /// `SystemCallError` class
     ///
-    inline value::Class const SystemCallError =
-        detail::unsafe_coerce<value::Class>(::rb_eSystemCallError);
+    inline value::ClassT<value::Exception> const SystemCallError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSystemCallError);
 
 #ifdef RCX_IO_BUFFER
     /// `IO::Buffer` class
@@ -1145,18 +1196,6 @@ namespace rcx {
     ClassT<T> define_class(concepts::Identifier auto &&name, ClassT<S> superclass);
 
     template <typename T = Value> ClassT<T> define_class(concepts::Identifier auto &&name);
-  };
-
-  class RubyError {
-    Value exception_;
-
-  public:
-    explicit RubyError(Value exception) noexcept;
-
-    Value exception() const noexcept;
-
-    template <typename... Args>
-    static RubyError format(Class cls, std::format_string<Args...> fmt, Args &&...args);
   };
 
   namespace detail {

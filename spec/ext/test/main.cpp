@@ -353,12 +353,12 @@ void Base::cxx_exception_unknown() const {
   throw 42;
 }
 
-void Base::ruby_exception(Value e) const {
-  throw rcx::RubyError(e);
+void Base::ruby_exception(Exception e) const {
+  throw e;
 }
 
-void Base::ruby_exception_format(Class e, String s) const {
-  throw rcx::RubyError::format(e, "format {}", std::string_view(s));
+void Base::ruby_exception_format(ClassT<Exception> e, String s) const {
+  throw rcx::Exception::format(e, "format {}", std::string_view(s));
 }
 
 Value Base::with_block(Value x, rcx::Proc block) const {
@@ -411,9 +411,9 @@ extern "C" void Init_test() {
               .define_method_const("virtual_1", &Base::virtual_1)
               .define_method_const("cxx_exception", &Base::cxx_exception)
               .define_method_const("cxx_exception_unknown", &Base::cxx_exception_unknown)
-              .define_method_const("ruby_exception", &Base::ruby_exception, arg<Value>)
-              .define_method_const(
-                  "ruby_exception_format", &Base::ruby_exception_format, arg<Class>, arg<String>)
+              .define_method_const("ruby_exception", &Base::ruby_exception, arg<Exception>)
+              .define_method_const("ruby_exception_format", &Base::ruby_exception_format,
+                  arg<ClassT<Exception>>, arg<String>)
               .define_method_const("with_block", &Base::with_block, arg<Value>, block);
 
   cDerived = ruby.define_class<Derived>("Derived", *cBase)

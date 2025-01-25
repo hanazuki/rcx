@@ -30,7 +30,7 @@
   [](auto F) {                                                                                     \
     try {                                                                                          \
       F();                                                                                         \
-    } catch(rcx::RubyError const &e) {                                                             \
+    } catch(rcx::value::Exception const &e) {                                                      \
       return;                                                                                      \
     }                                                                                              \
     rb_raise(rb_eExpectationNotMetError(), "%s:%d: Expected %s to raise", __FILE__, __LINE__, #V); \

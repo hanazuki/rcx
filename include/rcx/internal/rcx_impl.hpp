@@ -17,6 +17,32 @@
 #include <cxxabi.h>
 #endif
 
+namespace std {
+  template <std::derived_from<rcx::Value> T>
+  template <typename ParseContext>
+  constexpr ParseContext::iterator formatter<T, char>::parse(ParseContext &ctx) {
+    auto it = ctx.begin();
+    if(it == ctx.end()) {
+      return it;
+    }
+    if(*it == '#') {
+      inspect = true;
+      ++it;
+    }
+    if(it == ctx.end() || *it != '}') {
+      throw std::format_error("Invalid format args for std::formatter<ValueBase>.");
+    }
+    return it;
+  }
+
+  template <std::derived_from<rcx::Value> T>
+  template <typename FormatContext>
+  FormatContext::iterator formatter<T, char>::format(T value, FormatContext &ctx) const {
+    return std::format_to(ctx.out(), "{}",
+        static_cast<std::string_view>(inspect ? value.inspect() : value.to_string()));
+  }
+}
+
 namespace rcx {
   namespace detail {
 #if HAVE_ABI___CXA_DEMANGLE
@@ -113,9 +139,9 @@ namespace rcx {
       case RUBY_TAG_NONE:
         return;
       case RUBY_TAG_RAISE: {
-        auto err = detail::unsafe_coerce<Value>(rb_errinfo());
+        Exception const err = detail::unsafe_coerce<Exception>(rb_errinfo());
         rb_set_errinfo(RUBY_Qnil);
-        throw RubyError(err);
+        throw err;
       }
       default:
         throw Jump(state);
@@ -273,7 +299,7 @@ namespace rcx {
       int const v = NUM2INT(value.as_VALUE());
       signed char const r = static_cast<signed char>(v);
       if(v != static_cast<int>(r)) {
-        throw RubyError::format(builtin::RangeError,
+        throw Exception::format(builtin::RangeError,
             "integer {} too {} to convert to 'signed char'", v, v < 0 ? "small" : "big");
       }
       return r;
@@ -286,7 +312,7 @@ namespace rcx {
       int const v = NUM2INT(value.as_VALUE());
       unsigned char const r = static_cast<unsigned char>(v);
       if(v != static_cast<int>(r)) {
-        throw RubyError::format(builtin::RangeError,
+        throw Exception::format(builtin::RangeError,
             "integer {} too {} to convert to 'unsigned char'", v, v < 0 ? "small" : "big");
       }
       return r;
@@ -312,8 +338,28 @@ namespace rcx {
     RCX_DEFINE_CONV(long long, RB_NUM2LL, RB_LL2NUM);
     RCX_DEFINE_CONV(unsigned long long, RB_NUM2ULL, RB_ULL2NUM);
     RCX_DEFINE_CONV(double, rb_num2dbl, rb_float_new);
-
 #undef RCX_DEFINE_CONV
+
+#define RCX_DEFINE_CLASS_CONV(CLASS)                                                               \
+  inline ClassT<CLASS> FromValue<ClassT<CLASS>>::convert(Value value) {                            \
+    auto cls = from_Value<Class>(value);                                                           \
+    if(cls.is_subclass_of(builtin::CLASS)) {                                                       \
+      return detail::unsafe_coerce<ClassT<CLASS>>(cls.as_VALUE());                                 \
+    }                                                                                              \
+    throw Exception::format(builtin::TypeError, "TODO");                                           \
+  }
+
+    RCX_DEFINE_CLASS_CONV(Module);
+    RCX_DEFINE_CLASS_CONV(Class);
+    RCX_DEFINE_CLASS_CONV(Symbol);
+    RCX_DEFINE_CLASS_CONV(Proc);
+    RCX_DEFINE_CLASS_CONV(String);
+    RCX_DEFINE_CLASS_CONV(Array);
+    RCX_DEFINE_CLASS_CONV(Exception);
+#ifdef RCX_IO_BUFFER
+    RCX_DEFINE_CLASS_CONV(IOBuffer);
+#endif
+#undef RCX_DEFINE_CLASS_CONV
 
     template <std::derived_from<typed_data::WrappedStructBase> T>
     inline std::reference_wrapper<T> FromValue<T>::convert(Value value) {
@@ -507,13 +553,19 @@ namespace rcx {
     }
 
     template <typename T> inline bool ValueBase::is_instance_of(ClassT<T> klass) const {
-      return detail::protect(
-          [&] { return RBTEST(::rb_obj_is_instance_of(as_VALUE(), klass.as_VALUE())); });
+      return detail::protect([&] {
+        Value const result =
+            detail::unsafe_coerce<Value>(::rb_obj_is_instance_of(as_VALUE(), klass.as_VALUE()));
+        return result.test();
+      });
     }
 
     template <typename T> inline bool ValueBase::is_kind_of(ClassT<T> klass) const {
-      return detail::protect(
-          [&] { return RBTEST(::rb_obj_is_kind_of(as_VALUE(), klass.as_VALUE())); });
+      return detail::protect([&] {
+        Value const result =
+            detail::unsafe_coerce<Value>(::rb_obj_is_kind_of(as_VALUE(), klass.as_VALUE()));
+        return result.test();
+      });
     }
 
     /// ValueT
@@ -688,6 +740,22 @@ namespace rcx {
     }
 
     template <typename T>
+    template <typename S>
+    inline bool ClassT<T>::is_subclass_of(ClassT<S> klass) const {
+      Value const result =
+          detail::unsafe_coerce<Value>(::rb_class_inherited_p(this->as_VALUE(), klass.as_VALUE()));
+      return result.test();
+    }
+
+    template <typename T>
+    template <typename S>
+    inline bool ClassT<T>::is_superclass_of(ClassT<S> klass) const {
+      Value const result =
+          detail::unsafe_coerce<Value>(::rb_class_inherited_p(klass.as_VALUE(), this->as_VALUE()));
+      return result.test();
+    }
+
+    template <typename T>
     template <concepts::ArgSpec... ArgSpec>
     inline ClassT<T> ClassT<T>::define_method(concepts::Identifier auto &&mid,
         std::invocable<T &, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
@@ -753,11 +821,11 @@ namespace rcx {
     }
   }
 
-  template <typename T> ClassT<T> convert::FromValue<ClassT<T>>::convert(Value value) {
+  inline Class convert::FromValue<Class>::convert(Value value) {
     if(::rb_type(value.as_VALUE()) != RUBY_T_CLASS) {
       rb_raise(rb_eTypeError, "Expected a Class but got a %s", rb_obj_classname(value.as_VALUE()));
     }
-    return detail::unsafe_coerce<ClassT<T>>{value.as_VALUE()};
+    return detail::unsafe_coerce<Class>{value.as_VALUE()};
   };
 
   /// Symbol
@@ -878,6 +946,26 @@ namespace rcx {
     };
   }
 
+  /// Exception
+
+  namespace value {
+    template <std::derived_from<Exception> E, typename... Args>
+    inline E Exception::format(ClassT<E> cls, std::format_string<Args...> fmt, Args &&...args) {
+      auto const msg = std::vformat(fmt.get(), std::make_format_args(args...));
+      return cls.new_instance(String::intern_from(msg));
+    }
+  }
+
+  namespace convert {
+    inline Exception convert::FromValue<Exception>::convert(Value value) {
+      if(!value.is_kind_of(builtin::Exception)) {
+        throw Exception::format(
+            builtin::TypeError, "Expected an Exception but got a {}", value.get_class());
+      }
+      return detail::unsafe_coerce<Exception>(value.as_VALUE());
+    }
+  }
+
 #ifdef RCX_IO_BUFFER
   /// IOBuffer
   namespace value {
@@ -944,7 +1032,7 @@ namespace rcx {
       try {
         lock();
         return true;
-      } catch(RubyError const &) {
+      } catch(Exception const &) {
         return false;
       }
     }
@@ -1102,7 +1190,7 @@ namespace rcx {
   inline decltype(auto) convert::FromValue<std::tuple<T...>>::convert(Value value) {
     auto array = from_Value<Array>(value);
     if(array.size() != sizeof...(T)) {
-      throw RubyError::format(
+      throw Exception::format(
           builtin::ArgumentError, "Array of length {} is expected", sizeof...(T));
     }
     return [array]<size_t... I>(std::index_sequence<I...>) {
@@ -1183,19 +1271,6 @@ namespace rcx {
     return define_class<T>(std::forward<decltype(name)>(name), builtin::Object);
   }
 
-  inline RubyError::RubyError(Value exception) noexcept: exception_(exception) {
-  }
-
-  inline Value RubyError::exception() const noexcept {
-    return exception_;
-  }
-
-  template <typename... Args>
-  inline RubyError RubyError::format(Class cls, std::format_string<Args...> fmt, Args &&...args) {
-    auto const msg = std::format(fmt, std::forward<Args>(args)...);
-    return RubyError{cls.new_instance(String::intern_from(msg))};
-  }
-
   namespace detail {
     inline std::string demangle_type_info(std::type_info const &ti) {
       if constexpr(have_abi_cxa_demangle) {
@@ -1225,8 +1300,8 @@ namespace rcx {
         return functor();
       } catch(Jump const &jump) {
         ::rb_jump_tag(jump.state);
-      } catch(RubyError const &exc) {
-        ::rb_exc_raise(exc.exception().as_VALUE());
+      } catch(Exception const &exc) {
+        ::rb_exc_raise(exc.as_VALUE());
       } catch(std::exception const &exc) {
         ::rb_exc_raise(make_ruby_exception(&exc, &typeid(exc)).as_VALUE());
       } catch(...) {
@@ -1238,31 +1313,5 @@ namespace rcx {
         }
       }
     }
-  }
-}
-
-namespace std {
-  template <std::derived_from<rcx::Value> T>
-  template <typename ParseContext>
-  constexpr ParseContext::iterator formatter<T, char>::parse(ParseContext &ctx) {
-    auto it = ctx.begin();
-    if(it == ctx.end()) {
-      return it;
-    }
-    if(*it == '#') {
-      inspect = true;
-      ++it;
-    }
-    if(it == ctx.end() || *it != '}') {
-      throw std::format_error("Invalid format args for std::formatter<ValueBase>.");
-    }
-    return it;
-  }
-
-  template <std::derived_from<rcx::Value> T>
-  template <typename FormatContext>
-  FormatContext::iterator formatter<T, char>::format(T value, FormatContext &ctx) const {
-    return std::format_to(ctx.out(), "{}",
-        static_cast<std::string_view>(inspect ? value.inspect() : value.to_string()));
   }
 }
