@@ -237,7 +237,8 @@ namespace rcx {
     inline typename Arg<T, name>::ResultType Arg<T, name>::parse(
         Ruby &, Value, std::span<Value> &args) {
       if(args.empty()) {
-        rb_raise(rb_eArgError, "Missing required argument (%s)", name.data());
+        throw Exception::format(builtin::ArgumentError, "Missing required argument: {}",
+            static_cast<std::string_view>(name));
       }
       auto arg = from_Value<T>(args.front());
       args = std::ranges::drop_view(args, 1);
@@ -346,7 +347,8 @@ namespace rcx {
     if(cls.is_subclass_of(builtin::CLASS)) {                                                       \
       return detail::unsafe_coerce<ClassT<CLASS>>(cls.as_VALUE());                                 \
     }                                                                                              \
-    throw Exception::format(builtin::TypeError, "TODO");                                           \
+    throw Exception::format(                                                                       \
+        builtin::ArgumentError, "Expected a subclass of {} but got {}", builtin::CLASS, cls);      \
   }
 
     RCX_DEFINE_CLASS_CONV(Module);
@@ -717,7 +719,8 @@ namespace rcx {
   inline Module convert::FromValue<Module>::convert(Value value) {
     auto const type = ::rb_type(value.as_VALUE());
     if(type != RUBY_T_MODULE && type != RUBY_T_CLASS) {
-      rb_raise(rb_eTypeError, "Expected a Module but got a %s", rb_obj_classname(value.as_VALUE()));
+      throw Exception::format(
+          builtin::TypeError, "Expected a Module but got a {}", value.get_class());
     }
     return detail::unsafe_coerce<Module>{value.as_VALUE()};
   };
@@ -823,7 +826,8 @@ namespace rcx {
 
   inline Class convert::FromValue<Class>::convert(Value value) {
     if(::rb_type(value.as_VALUE()) != RUBY_T_CLASS) {
-      rb_raise(rb_eTypeError, "Expected a Class but got a %s", rb_obj_classname(value.as_VALUE()));
+      throw Exception::format(
+          builtin::TypeError, "Expected a Class but got a {}", value.get_class());
     }
     return detail::unsafe_coerce<Class>{value.as_VALUE()};
   };
@@ -848,7 +852,8 @@ namespace rcx {
 
   inline Symbol convert::FromValue<Symbol>::convert(Value value) {
     if(::rb_type(value.as_VALUE()) != RUBY_T_SYMBOL) {
-      rb_raise(rb_eTypeError, "Expected a Symbol but got a %s", rb_obj_classname(value.as_VALUE()));
+      throw Exception::format(
+          builtin::TypeError, "Expected a Symbol but got a {}", value.get_class());
     }
     return detail::unsafe_coerce<Symbol>(value.as_VALUE());
   }
@@ -914,7 +919,8 @@ namespace rcx {
 
   inline String convert::FromValue<String>::convert(Value value) {
     if(::rb_type(value.as_VALUE()) != RUBY_T_STRING) {
-      rb_raise(rb_eTypeError, "Expected a String but got a %s", rb_obj_classname(value.as_VALUE()));
+      throw Exception::format(
+          builtin::TypeError, "Expected a String but got a {}", value.get_class());
     }
     return detail::unsafe_coerce<String>(value.as_VALUE());
   }
@@ -940,7 +946,8 @@ namespace rcx {
   namespace convert {
     inline Proc convert::FromValue<Proc>::convert(Value value) {
       if(!rb_obj_is_proc(value.as_VALUE())) {
-        rb_raise(rb_eTypeError, "Expected a Proc but got a %s", rb_obj_classname(value.as_VALUE()));
+        throw Exception::format(
+            builtin::TypeError, "Expected a Proc but got a {}", value.get_class());
       }
       return detail::unsafe_coerce<Proc>{value.as_VALUE()};
     };
@@ -1040,9 +1047,9 @@ namespace rcx {
 
   namespace convert {
     inline IOBuffer FromValue<IOBuffer>::convert(Value value) {
-      if(!rb_obj_is_kind_of(value.as_VALUE(), rb_cIOBuffer)) {
-        rb_raise(
-            rb_eTypeError, "Expected an IOBuffer but got a %s", rb_obj_classname(value.as_VALUE()));
+      if(!value.is_kind_of(builtin::IOBuffer)) {
+        throw Exception::format(
+            builtin::TypeError, "Expected an IO::Buffer but got a {}", value.get_class());
       }
       return detail::unsafe_coerce<IOBuffer>(value.as_VALUE());
     }
@@ -1171,7 +1178,8 @@ namespace rcx {
 
   inline Array convert::FromValue<Array>::convert(Value value) {
     if(::rb_type(value.as_VALUE()) != RUBY_T_ARRAY) {
-      rb_raise(rb_eTypeError, "Expected an Array but got a %s", rb_obj_classname(value.as_VALUE()));
+      throw Exception::format(
+          builtin::TypeError, "Expected an Array but got a {}", value.get_class());
     }
     return detail::unsafe_coerce<Array>(value.as_VALUE());
   }
