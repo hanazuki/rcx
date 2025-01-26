@@ -623,12 +623,12 @@ namespace rcx {
 
     inline String Value::inspect() const {
       return detail::unsafe_coerce<String>(
-          detail::protect([&]() noexcept { return ::rb_inspect(as_VALUE()); }));
+          detail::protect([this]() noexcept { return ::rb_inspect(as_VALUE()); }));
     }
 
     inline String Value::to_string() const {
       return detail::unsafe_coerce<String>(
-          detail::protect([&]() noexcept { return ::rb_obj_as_string(as_VALUE()); }));
+          detail::protect([this]() noexcept { return ::rb_obj_as_string(as_VALUE()); }));
     }
 
     inline bool Value::instance_variable_defined(concepts::Identifier auto &&name) const {
