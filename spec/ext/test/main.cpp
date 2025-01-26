@@ -11,7 +11,6 @@
 #include <rcx/rcx.hpp>
 
 #include "assert.hpp"
-#include "rcx/internal/rcx.hpp"
 
 using namespace std::literals;
 using namespace rcx::value;
