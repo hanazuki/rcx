@@ -407,11 +407,13 @@ namespace rcx {
     /// Creates a `Symbol` for the name encoded in UTF-8.
     ///
     template <detail::u8cxstring> Symbol operator""_sym();
-    /// Creates an `Id` for the name encoded in ASCII/ASCII-8BIT.
+    /// Creates an ID for the name encoded in ASCII/ASCII-8BIT.
     ///
+    /// IDs created this way is static and never garbage-collected.
     template <detail::cxstring> Id operator""_id();
-    /// Creates an `Id` for the name encoded in UTF-8.
+    /// Creates an ID for the name encoded in UTF-8.
     ///
+    /// IDs created this way is static and never garbage-collected.
     template <detail::u8cxstring> Id operator""_id();
   }
 

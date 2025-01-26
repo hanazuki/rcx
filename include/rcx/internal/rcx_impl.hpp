@@ -1244,29 +1244,21 @@ namespace rcx {
     }
 
     template <detail::cxstring s> String operator""_fstr() {
-      static String str = detail::unsafe_coerce<String>(detail::protect(
-          [&]() noexcept { return ::rb_obj_freeze(::rb_str_new_static(s.data(), s.size())); }));
-      return str;
+      return String::intern_from(s);
     }
 
     template <detail::u8cxstring s> String operator""_fstr() {
-      static String str = detail::unsafe_coerce<String>(detail::protect([&]() noexcept {
-        return ::rb_obj_freeze(::rb_enc_str_new_static(
-            reinterpret_cast<char const *>(s.data()), s.size(), rb_utf8_encoding()));
-      }));
-      return str;
+      return String::intern_from(s);
     }
 
     template <detail::cxstring s> Symbol operator""_sym() {
-      static Symbol sym = detail::unsafe_coerce<Symbol>(
+      return detail::unsafe_coerce<Symbol>(
           detail::protect([&]() noexcept { return ::rb_id2sym(operator""_id < s>().as_ID()); }));
-      return sym;
     }
 
     template <detail::u8cxstring s> Symbol operator""_sym() {
-      static Symbol sym = detail::unsafe_coerce<Symbol>(
+      return detail::unsafe_coerce<Symbol>(
           detail::protect([&]() noexcept { return ::rb_id2sym(operator""_id < s>().as_VALUE()); }));
-      return sym;
     }
 
     template <detail::cxstring s> Id operator""_id() {
