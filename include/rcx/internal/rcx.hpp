@@ -520,7 +520,7 @@ namespace rcx {
       template <concepts::ConvertibleFromValue R = Value>
       R send(concepts::Identifier auto &&mid, concepts::ConvertibleIntoValue auto &&...args) const;
 
-      bool test() const;
+      bool test() const noexcept;
 
       /// Converts the object into a String using its `#inspect` method.
       ///

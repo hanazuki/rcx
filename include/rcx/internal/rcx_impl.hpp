@@ -617,7 +617,7 @@ namespace rcx {
       })));
     }
 
-    inline bool Value::test() const {
+    inline bool Value::test() const noexcept {
       return RB_TEST(as_VALUE());
     }
 
