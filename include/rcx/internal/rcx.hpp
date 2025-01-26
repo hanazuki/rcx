@@ -42,6 +42,8 @@ namespace rcx {
   class Ruby;
   class Id;
 
+  /// Value wrappers.
+  ///
   namespace value {
     enum Nilability : bool;
 
@@ -84,7 +86,7 @@ namespace rcx {
 
   /// Implementation details.
   ///
-  /// @private
+  /// @internal
   namespace detail {
     template <typename T> struct unsafe_coerce {
       VALUE value;
