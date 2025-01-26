@@ -734,8 +734,8 @@ namespace rcx {
       char const *RCX_Nonnull cdata() const noexcept;
       explicit operator std::string_view() const noexcept;
 
-      String locktmp() const;
-      String unlocktmp() const;
+      String lock() const;
+      String unlock() const;
     };
 
     class Array: public ValueT<Array, Value> {

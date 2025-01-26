@@ -921,12 +921,12 @@ namespace rcx {
       return {data(), size()};
     }
 
-    inline String String::locktmp() const {
+    inline String String::lock() const {
       return detail::unsafe_coerce<String>(
           detail::protect(detail::assume_noexcept(::rb_str_locktmp), as_VALUE()));
     }
 
-    inline String String::unlocktmp() const {
+    inline String String::unlock() const {
       return detail::unsafe_coerce<String>(
           detail::protect(detail::assume_noexcept(::rb_str_unlocktmp), as_VALUE()));
     }
