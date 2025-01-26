@@ -162,11 +162,13 @@ namespace rcx {
       int state;
     };
 
-    template <typename F> auto protect(F functor) -> auto;
+    template <std::invocable<> F>
+    auto protect(F functor) -> auto
+      requires(noexcept(functor()));
     template <typename A, typename R>
       requires(std::is_integral_v<A> && sizeof(A) == sizeof(VALUE) && std::is_integral_v<R> &&
                sizeof(R) == sizeof(VALUE))
-    VALUE protect(VALUE (*RCX_Nonnull func)(A), A arg);
+    VALUE protect(VALUE (*RCX_Nonnull func)(A) noexcept, A arg);
 
     template <typename T> struct wrap_ref {
       using type = T;

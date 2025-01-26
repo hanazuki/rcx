@@ -148,7 +148,10 @@ namespace rcx {
       }
     }
 
-    template <typename F> inline auto protect(F functor) -> auto {
+    template <std::invocable<> F>
+    inline auto protect(F functor) -> auto
+      requires(noexcept(functor()))
+    {
       int state = 0;
 
       using Result = std::invoke_result_t<F>;
@@ -180,7 +183,7 @@ namespace rcx {
     template <typename A, typename R>
       requires(std::is_integral_v<A> && sizeof(A) == sizeof(VALUE) && std::is_integral_v<R> &&
                sizeof(R) == sizeof(VALUE))
-    inline R protect(R (*RCX_Nonnull func)(A), A arg) {
+    inline R protect(R (*RCX_Nonnull func)(A) noexcept, A arg) {
       int state = 0;
 
       auto result =
@@ -194,13 +197,14 @@ namespace rcx {
      * Assumes the (C) function doesn't throw C++ exceptions.
      */
     template <typename R, typename... A>
-    auto assume_noexcept(R (*RCX_Nonnull f)(A...)) noexcept -> R (*RCX_Nonnull)(A...) noexcept {
-      return reinterpret_cast<R (*)(A...) noexcept>(f);
+    constexpr auto assume_noexcept(R (*RCX_Nonnull f)(A...)) noexcept
+        -> R (*RCX_Nonnull)(A...) noexcept {
+      return reinterpret_cast<R (*RCX_Nonnull)(A...) noexcept>(f);
     }
     template <typename R, typename... A>
-    auto assume_noexcept(R (*RCX_Nonnull f)(A..., ...)) noexcept
+    constexpr auto assume_noexcept(R (*RCX_Nonnull f)(A..., ...)) noexcept
         -> R (*RCX_Nonnull)(A..., ...) noexcept {
-      return reinterpret_cast<R (*)(A..., ...) noexcept>(f);
+      return reinterpret_cast<R (*RCX_Nonnull)(A..., ...) noexcept>(f);
     }
 
     /**
@@ -269,7 +273,8 @@ namespace rcx {
     }
 
     inline Block::ResultType Block::parse(Ruby &, Value, std::span<Value> &) {
-      return detail::unsafe_coerce<Proc>(detail::protect([] { return ::rb_block_proc(); }));
+      return detail::unsafe_coerce<Proc>(
+          detail::protect([]() noexcept { return ::rb_block_proc(); }));
     }
   }
 
@@ -324,7 +329,7 @@ namespace rcx {
 
 #define RCX_DEFINE_CONV(TYPE, FROM_VALUE, INTO_VALUE)                                              \
   inline TYPE FromValue<TYPE>::convert(Value value) {                                              \
-    return detail::protect([v = value.as_VALUE()] { return FROM_VALUE(v); });                      \
+    return detail::protect([v = value.as_VALUE()]() noexcept { return FROM_VALUE(v); });           \
   }                                                                                                \
   inline Value IntoValue<TYPE>::convert(TYPE value) {                                              \
     return detail::unsafe_coerce<Value>(INTO_VALUE(value));                                        \
@@ -366,9 +371,11 @@ namespace rcx {
     template <std::derived_from<typed_data::WrappedStructBase> T>
     inline std::reference_wrapper<T> FromValue<T>::convert(Value value) {
       if constexpr(!std::is_const_v<T>) {
-        detail::protect([&] { ::rb_check_frozen(value.as_VALUE()); });
+        detail::protect([&]() noexcept { ::rb_check_frozen(value.as_VALUE()); });
       }
-      auto const data = rb_check_typeddata(value.as_VALUE(), typed_data::DataType<T>::get());
+      auto const data = detail::protect([&]() noexcept {
+        return ::rb_check_typeddata(value.as_VALUE(), typed_data::DataType<T>::get());
+      });
       if(!data) {
         throw std::runtime_error{"Object is not yet initialized"};
       }
@@ -555,7 +562,7 @@ namespace rcx {
     }
 
     template <typename T> inline bool ValueBase::is_instance_of(ClassT<T> klass) const {
-      return detail::protect([&] {
+      return detail::protect([&]() noexcept {
         Value const result =
             detail::unsafe_coerce<Value>(::rb_obj_is_instance_of(as_VALUE(), klass.as_VALUE()));
         return result.test();
@@ -563,7 +570,7 @@ namespace rcx {
     }
 
     template <typename T> inline bool ValueBase::is_kind_of(ClassT<T> klass) const {
-      return detail::protect([&] {
+      return detail::protect([&]() noexcept {
         Value const result =
             detail::unsafe_coerce<Value>(::rb_obj_is_kind_of(as_VALUE(), klass.as_VALUE()));
         return result.test();
@@ -575,12 +582,13 @@ namespace rcx {
     template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
     ClassT<Derived> ValueT<Derived, Super, nilable>::get_class() const {
       return detail::unsafe_coerce<ClassT<Derived>>(
-          detail::protect(::rb_obj_class, this->as_VALUE()));
+          detail::protect(detail::assume_noexcept(::rb_obj_class), this->as_VALUE()));
     }
 
     template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
     Derived ValueT<Derived, Super, nilable>::freeze() const {
-      return detail::unsafe_coerce<Derived>(detail::protect(::rb_obj_freeze, this->as_VALUE()));
+      return detail::unsafe_coerce<Derived>(
+          detail::protect(detail::assume_noexcept(::rb_obj_freeze), this->as_VALUE()));
     }
 
     template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
@@ -590,7 +598,7 @@ namespace rcx {
         std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
       auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(
           std::forward<decltype(function)>(function));
-      detail::protect([&] {
+      detail::protect([&]() noexcept {
         auto const singleton = ::rb_singleton_class(this->as_VALUE());
         rb_define_method_id(
             singleton, detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
@@ -603,7 +611,7 @@ namespace rcx {
     template <concepts::ConvertibleFromValue R>
     inline R Value::send(
         concepts::Identifier auto &&mid, concepts::ConvertibleIntoValue auto &&...args) const {
-      return from_Value<R>(detail::unsafe_coerce<Value>(detail::protect([&] {
+      return from_Value<R>(detail::unsafe_coerce<Value>(detail::protect([&]() noexcept {
         return ::rb_funcall(as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)),
             sizeof...(args), into_Value(std::forward<decltype(args)>(args)).as_VALUE()...);
       })));
@@ -615,23 +623,23 @@ namespace rcx {
 
     inline String Value::inspect() const {
       return detail::unsafe_coerce<String>(
-          detail::protect([&] { return ::rb_inspect(as_VALUE()); }));
+          detail::protect([&]() noexcept { return ::rb_inspect(as_VALUE()); }));
     }
 
     inline String Value::to_string() const {
       return detail::unsafe_coerce<String>(
-          detail::protect([&] { return ::rb_obj_as_string(as_VALUE()); }));
+          detail::protect([&]() noexcept { return ::rb_obj_as_string(as_VALUE()); }));
     }
 
     inline bool Value::instance_variable_defined(concepts::Identifier auto &&name) const {
-      return detail::protect([&] {
+      return detail::protect([&]() noexcept {
         return ::rb_ivar_defined(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
       });
     }
 
     template <concepts::ConvertibleFromValue T>
     inline auto Value::instance_variable_get(concepts::Identifier auto &&name) const -> auto {
-      return from_Value<T>(detail::unsafe_coerce<Value>(detail::protect([&] {
+      return from_Value<T>(detail::unsafe_coerce<Value>(detail::protect([&]() noexcept {
         return ::rb_ivar_get(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
       })));
     }
@@ -639,7 +647,7 @@ namespace rcx {
     inline void Value::instance_variable_set(
         concepts::Identifier auto &&name, concepts::ConvertibleIntoValue auto &&value) const {
       auto const v = into_Value(std::forward<decltype(value)>(value));
-      return detail::protect([&] {
+      return detail::protect([&]() noexcept {
         ::rb_ivar_set(
             as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)), v.as_VALUE());
       });
@@ -655,8 +663,10 @@ namespace rcx {
 
   namespace value {
     inline Module Module::define_module(concepts::Identifier auto &&name) const {
-      return detail::unsafe_coerce<Module>(::rb_define_module_id_under(
-          as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name))));
+      return detail::unsafe_coerce<Module>(detail::protect([&]() noexcept {
+        return ::rb_define_module_id_under(
+            as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
+      }));
     }
 
     inline String Module::name() const {
@@ -666,7 +676,7 @@ namespace rcx {
     template <typename T, typename S>
     inline ClassT<T> Module::define_class(
         concepts::Identifier auto &&name, ClassT<S> superclass) const {
-      ClassT<T> klass = detail::unsafe_coerce<ClassT<T>>(detail::protect([&] {
+      ClassT<T> klass = detail::unsafe_coerce<ClassT<T>>(detail::protect([&]() noexcept {
         return ::rb_define_class_id_under(
             as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)), superclass.as_VALUE());
       }));
@@ -682,7 +692,7 @@ namespace rcx {
     inline Module Module::define_method(concepts::Identifier auto &&mid,
         std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
       auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(function);
-      detail::protect([&] {
+      detail::protect([&]() noexcept {
         rb_define_method_id(
             as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
       });
@@ -690,18 +700,19 @@ namespace rcx {
     }
 
     inline Module Module::new_module() {
-      return detail::unsafe_coerce<Module>(detail::protect([] { return ::rb_module_new(); }));
+      return detail::unsafe_coerce<Module>(
+          detail::protect([]() noexcept { return ::rb_module_new(); }));
     }
 
     inline bool Module::const_defined(concepts::Identifier auto &&name) const {
-      return detail::protect([&] {
+      return detail::protect([&]() noexcept {
         return ::rb_const_defined(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
       });
     }
 
     template <concepts::ConvertibleFromValue T>
     inline T Module::const_get(concepts::Identifier auto &&name) const {
-      return from_Value<T>(detail::unsafe_coerce<Value>(detail::protect([&] {
+      return from_Value<T>(detail::unsafe_coerce<Value>(detail::protect([&]() noexcept {
         return ::rb_const_get(as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)));
       })));
     }
@@ -709,7 +720,7 @@ namespace rcx {
     inline void Module::const_set(
         concepts::Identifier auto &&name, concepts::ConvertibleIntoValue auto &&value) const {
       auto const v = into_Value(std::forward<decltype(value)>(value));
-      return detail::protect([&] {
+      return detail::protect([&]() noexcept {
         ::rb_const_set(
             as_VALUE(), detail::into_ID(std::forward<decltype(name)>(name)), v.as_VALUE());
       });
@@ -734,12 +745,14 @@ namespace rcx {
     {
       std::array<VALUE, sizeof...(args)> vargs{
         into_Value(std::forward<decltype(args)>(args)).as_VALUE()...};
-      return detail::unsafe_coerce<T>(detail::protect(
-          [&] { return ::rb_class_new_instance(vargs.size(), vargs.data(), this->as_VALUE()); }));
+      return detail::unsafe_coerce<T>(detail::protect([&]() noexcept {
+        return ::rb_class_new_instance(vargs.size(), vargs.data(), this->as_VALUE());
+      }));
     }
 
     template <typename T> inline Value ClassT<T>::allocate() const {
-      return detail::unsafe_coerce<Value>(detail::protect(::rb_obj_alloc, this->as_VALUE()));
+      return detail::unsafe_coerce<Value>(
+          detail::protect(detail::assume_noexcept(::rb_obj_alloc), this->as_VALUE()));
     }
 
     template <typename T>
@@ -765,7 +778,7 @@ namespace rcx {
       auto const callback =
           detail::method_callback<arg::Self<detail::self_type<T>>, ArgSpec...>::alloc(
               std::forward<decltype(function)>(function));
-      detail::protect([&]() {
+      detail::protect([&]() noexcept {
         rb_define_method_id(
             this->as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
       });
@@ -780,7 +793,7 @@ namespace rcx {
       auto const callback =
           detail::method_callback<arg::Self<detail::self_type_const<T>>, ArgSpec...>::alloc(
               function);
-      detail::protect([&] {
+      detail::protect([&]() noexcept {
         rb_define_method_id(
             this->as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
       });
@@ -793,7 +806,7 @@ namespace rcx {
     inline ClassT<T> ClassT<T>::define_constructor(ArgSpec...) const {
       auto const callback = detail::method_callback<arg::Self<Value>, ArgSpec...>::alloc(
           typed_data::DataType<T>::template initialize<typename ArgSpec::ResultType...>);
-      detail::protect([&] {
+      detail::protect([&]() noexcept {
         using namespace literals;
         rb_define_method_id(this->as_VALUE(), detail::into_ID("initialize"_id), callback, -1);
       });
@@ -806,7 +819,7 @@ namespace rcx {
     {
       auto const callback = detail::method_callback<arg::Self<Value>, arg::Arg<T const &>>::alloc(
           typed_data::DataType<T>::initialize_copy);
-      detail::protect([&] {
+      detail::protect([&]() noexcept {
         using namespace literals;
         rb_define_method_id(this->as_VALUE(), detail::into_ID("initialize_copy"_id), callback, -1);
       });
@@ -820,7 +833,7 @@ namespace rcx {
     template <typename S>
     inline ClassT<S> ClassT<T>::new_class(ClassT<S> superclass) {
       return detail::unsafe_coerce<ClassT<S>>(
-          detail::protect(::rb_class_new, superclass.as_VALUE()));
+          detail::protect(detail::assume_noexcept(::rb_class_new), superclass.as_VALUE()));
     }
   }
 
@@ -839,14 +852,14 @@ namespace rcx {
     }
 
     inline Symbol::Symbol(std::string_view sv) noexcept
-        : Symbol(detail::protect([&] {
+        : Symbol(detail::protect([&]() noexcept {
             return detail::assume_noexcept(::rb_to_symbol)(
                 detail::assume_noexcept(::rb_interned_str)(sv.data(), sv.size()));
           })) {
     }
 
     inline ID Symbol::as_ID() const noexcept {
-      return detail::protect(::rb_sym2id, as_VALUE());
+      return detail::protect(detail::assume_noexcept(::rb_sym2id), as_VALUE());
     }
   }
 
@@ -865,7 +878,7 @@ namespace rcx {
       using CharT = typename std::remove_cvref_t<S>::value_type;
       using Traits = typename std::remove_cvref_t<S>::traits_type;
       std::basic_string_view<CharT, Traits> sv(std::forward<S>(s));
-      return detail::unsafe_coerce<String>(detail::protect([&] {
+      return detail::unsafe_coerce<String>(detail::protect([&]() noexcept {
         return (::rb_enc_interned_str)(
             reinterpret_cast<char const *>(sv.data()), sv.size(), CharTraits<CharT>::encoding());
       }));
@@ -880,7 +893,7 @@ namespace rcx {
       using CharT = typename std::remove_cvref_t<S>::value_type;
       using Traits = typename std::remove_cvref_t<S>::traits_type;
       std::basic_string_view<CharT, Traits> sv(std::forward<S>(s));
-      return detail::unsafe_coerce<String>(detail::protect([&] {
+      return detail::unsafe_coerce<String>(detail::protect([&]() noexcept {
         return (::rb_enc_str_new)(
             reinterpret_cast<char const *>(sv.data()), sv.size(), CharTraits<CharT>::encoding());
       }));
@@ -896,7 +909,7 @@ namespace rcx {
     }
 
     inline char *RCX_Nonnull String::data() const {
-      detail::protect([&] { ::rb_check_frozen(as_VALUE()); });
+      detail::protect([&]() noexcept { ::rb_check_frozen(as_VALUE()); });
       return RSTRING_PTR(as_VALUE());
     }
 
@@ -909,11 +922,13 @@ namespace rcx {
     }
 
     inline String String::locktmp() const {
-      return detail::unsafe_coerce<String>(detail::protect(::rb_str_locktmp, as_VALUE()));
+      return detail::unsafe_coerce<String>(
+          detail::protect(detail::assume_noexcept(::rb_str_locktmp), as_VALUE()));
     }
 
     inline String String::unlocktmp() const {
-      return detail::unsafe_coerce<String>(detail::protect(::rb_str_unlocktmp, as_VALUE()));
+      return detail::unsafe_coerce<String>(
+          detail::protect(detail::assume_noexcept(::rb_str_unlocktmp), as_VALUE()));
     }
   }
 
@@ -933,13 +948,13 @@ namespace rcx {
   namespace value {
     inline bool Proc::is_lambda() const {
       Value const v = detail::unsafe_coerce<Value>(
-          detail::protect([&] { return ::rb_proc_lambda_p(as_VALUE()); }));
+          detail::protect([&]() noexcept { return ::rb_proc_lambda_p(as_VALUE()); }));
       return v.test();
     }
 
     inline Value Proc::call(Array args) const {
       return detail::unsafe_coerce<Value>(
-          detail::protect([&] { return ::rb_proc_call(as_VALUE(), args.as_VALUE()); }));
+          detail::protect([&]() noexcept { return ::rb_proc_call(as_VALUE(), args.as_VALUE()); }));
     }
   }
 
@@ -978,61 +993,63 @@ namespace rcx {
   namespace value {
 
     inline IOBuffer IOBuffer::new_internal(size_t size) {
-      return detail::unsafe_coerce<IOBuffer>(detail::protect([size] {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([size]() noexcept {
         // Let Ruby allocate a buffer
         return ::rb_io_buffer_new(nullptr, size, RB_IO_BUFFER_INTERNAL);
       }));
     }
 
     inline IOBuffer IOBuffer::new_mapped(size_t size) {
-      return detail::unsafe_coerce<IOBuffer>(detail::protect([size] {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([size]() noexcept {
         // Let Ruby allocate a buffer
         return ::rb_io_buffer_new(nullptr, size, RB_IO_BUFFER_MAPPED);
       }));
     }
 
     template <size_t N> inline IOBuffer IOBuffer::new_external(std::span<std::byte, N> bytes) {
-      return detail::unsafe_coerce<IOBuffer>(detail::protect([bytes] {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([bytes]() noexcept {
         return ::rb_io_buffer_new(bytes.data(), bytes.size(), RB_IO_BUFFER_EXTERNAL);
       }));
     }
 
     template <size_t N>
     inline IOBuffer IOBuffer::new_external(std::span<std::byte const, N> bytes) {
-      return detail::unsafe_coerce<IOBuffer>(detail::protect([bytes] {
+      return detail::unsafe_coerce<IOBuffer>(detail::protect([bytes]() noexcept {
         return ::rb_io_buffer_new(const_cast<std::byte *>(bytes.data()), bytes.size(),
             static_cast<rb_io_buffer_flags>(RB_IO_BUFFER_EXTERNAL | RB_IO_BUFFER_READONLY));
       }));
     }
 
     inline void IOBuffer::free() const {
-      detail::protect([this] { ::rb_io_buffer_free(as_VALUE()); });
+      detail::protect([this]() noexcept { ::rb_io_buffer_free(as_VALUE()); });
     }
 
     inline void IOBuffer::resize(size_t size) const {
-      detail::protect([this, size] { ::rb_io_buffer_resize(as_VALUE(), size); });
+      detail::protect([this, size]() noexcept { ::rb_io_buffer_resize(as_VALUE(), size); });
     }
 
     inline std::span<std::byte> IOBuffer::bytes() const {
       void *ptr;
       size_t size;
-      detail::protect([&] { ::rb_io_buffer_get_bytes_for_writing(as_VALUE(), &ptr, &size); });
+      detail::protect(
+          [&]() noexcept { ::rb_io_buffer_get_bytes_for_writing(as_VALUE(), &ptr, &size); });
       return {static_cast<std::byte *>(ptr), size};
     }
 
     inline std::span<std::byte const> IOBuffer::cbytes() const {
       void const *ptr;
       size_t size;
-      detail::protect([&] { ::rb_io_buffer_get_bytes_for_reading(as_VALUE(), &ptr, &size); });
+      detail::protect(
+          [&]() noexcept { ::rb_io_buffer_get_bytes_for_reading(as_VALUE(), &ptr, &size); });
       return {static_cast<std::byte const *>(ptr), size};
     }
 
     inline void IOBuffer::lock() const {
-      detail::protect([this] { ::rb_io_buffer_lock(as_VALUE()); });
+      detail::protect([this]() noexcept { ::rb_io_buffer_lock(as_VALUE()); });
     }
 
     inline void IOBuffer::unlock() const {
-      detail::protect([this] { ::rb_io_buffer_unlock(as_VALUE()); });
+      detail::protect([this]() noexcept { ::rb_io_buffer_unlock(as_VALUE()); });
     }
 
     inline bool IOBuffer::try_lock() const {
@@ -1109,7 +1126,7 @@ namespace rcx {
     inline Value Array::operator[](size_t i) const {
       VALUE const index = RB_SIZE2NUM(i);
       return detail::unsafe_coerce<Value>(
-          detail::protect([&] { return ::rb_ary_aref(1, &index, as_VALUE()); }));
+          detail::protect([&]() noexcept { return ::rb_ary_aref(1, &index, as_VALUE()); }));
       ;
     }
 
@@ -1122,14 +1139,14 @@ namespace rcx {
 #endif
     inline Array Array::new_from(R const &elements) {
       // contiguous_range<T> has a layout combatible to VALUE[]
-      return detail::unsafe_coerce<Array>(detail::protect([&] {
+      return detail::unsafe_coerce<Array>(detail::protect([&]() noexcept {
         return ::rb_ary_new_from_values(
             elements.size(), reinterpret_cast<VALUE const *>(elements.data()));
       }));
     };
 
     inline Array Array::new_from(std::initializer_list<ValueBase> elements) {
-      return detail::unsafe_coerce<Array>(detail::protect([&] {
+      return detail::unsafe_coerce<Array>(detail::protect([&]() noexcept {
         return ::rb_ary_new_from_values(
             elements.size(), reinterpret_cast<VALUE const *>(elements.begin()));
       }));
@@ -1137,7 +1154,7 @@ namespace rcx {
 
     template <std::derived_from<ValueBase>... T>
     inline Array Array::new_from(std::tuple<T...> const &elements) {
-      return detail::unsafe_coerce<Array>(detail::protect([&] {
+      return detail::unsafe_coerce<Array>(detail::protect([&]() noexcept {
         return std::apply(
             [](auto... v) { return ::rb_ary_new_from_args(sizeof...(v), v.as_VALUE()...); },
             elements);
@@ -1145,34 +1162,35 @@ namespace rcx {
     }
 
     inline Array Array::new_array() {
-      return detail::unsafe_coerce<Array>(detail::protect([] { return ::rb_ary_new(); }));
+      return detail::unsafe_coerce<Array>(
+          detail::protect([]() noexcept { return ::rb_ary_new(); }));
     }
 
     inline Array Array::new_array(long capacity) {
       return detail::unsafe_coerce<Array>(
-          detail::protect([capacity] { return ::rb_ary_new_capa(capacity); }));
+          detail::protect([capacity]() noexcept { return ::rb_ary_new_capa(capacity); }));
     }
 
     template <concepts::ConvertibleIntoValue T> Array Array::push_back(T value) const {
       auto const v = into_Value<T>(value);
-      detail::protect([v, this] { ::rb_ary_push(as_VALUE(), v.as_VALUE()); });
+      detail::protect([v, this]() noexcept { ::rb_ary_push(as_VALUE(), v.as_VALUE()); });
       return *this;
     }
 
     template <concepts::ConvertibleFromValue T> inline T Array::pop_back() const {
       return from_Value<T>(detail::unsafe_coerce<Value>(
-          detail::protect([this] { return ::rb_ary_pop(as_VALUE()); })));
+          detail::protect([this]() noexcept { return ::rb_ary_pop(as_VALUE()); })));
     }
 
     template <concepts::ConvertibleIntoValue T> Array Array::push_front(T value) const {
       auto const v = into_Value<T>(value);
-      detail::protect([v, this] { ::rb_ary_unshift(as_VALUE(), v.as_VALUE()); });
+      detail::protect([v, this]() noexcept { ::rb_ary_unshift(as_VALUE(), v.as_VALUE()); });
       return *this;
     }
 
     template <concepts::ConvertibleFromValue T> inline T Array::pop_front() const {
       return from_Value<T>(detail::unsafe_coerce<Value>(
-          detail::protect([this] { return ::rb_ary_shift(as_VALUE()); })));
+          detail::protect([this]() noexcept { return ::rb_ary_shift(as_VALUE()); })));
     }
   }
 
@@ -1227,12 +1245,12 @@ namespace rcx {
 
     template <detail::cxstring s> String operator""_fstr() {
       static String str = detail::unsafe_coerce<String>(detail::protect(
-          [&] { return ::rb_obj_freeze(::rb_str_new_static(s.data(), s.size())); }));
+          [&]() noexcept { return ::rb_obj_freeze(::rb_str_new_static(s.data(), s.size())); }));
       return str;
     }
 
     template <detail::u8cxstring s> String operator""_fstr() {
-      static String str = detail::unsafe_coerce<String>(detail::protect([&] {
+      static String str = detail::unsafe_coerce<String>(detail::protect([&]() noexcept {
         return ::rb_obj_freeze(::rb_enc_str_new_static(
             reinterpret_cast<char const *>(s.data()), s.size(), rb_utf8_encoding()));
       }));
@@ -1241,24 +1259,25 @@ namespace rcx {
 
     template <detail::cxstring s> Symbol operator""_sym() {
       static Symbol sym = detail::unsafe_coerce<Symbol>(
-          detail::protect([&] { return ::rb_id2sym(operator""_id < s>().as_ID()); }));
+          detail::protect([&]() noexcept { return ::rb_id2sym(operator""_id < s>().as_ID()); }));
       return sym;
     }
 
     template <detail::u8cxstring s> Symbol operator""_sym() {
       static Symbol sym = detail::unsafe_coerce<Symbol>(
-          detail::protect([&] { return ::rb_id2sym(operator""_id < s>().as_VALUE()); }));
+          detail::protect([&]() noexcept { return ::rb_id2sym(operator""_id < s>().as_VALUE()); }));
       return sym;
     }
 
     template <detail::cxstring s> Id operator""_id() {
-      static Id const id{detail::protect([&] { return ::rb_intern2(s.data(), s.size()); })};
+      static Id const id{
+        detail::protect([&]() noexcept { return ::rb_intern2(s.data(), s.size()); })};
       return id;
     }
 
     template <detail::u8cxstring s> Id operator""_id() {
-      static Id const id{
-        detail::protect([&] { return ::rb_intern_str(operator""_fstr < s>().as_VALUE()); })};
+      static Id const id{detail::protect(
+          [&]() noexcept { return ::rb_intern_str(operator""_fstr < s>().as_VALUE()); })};
       return id;
     }
 
