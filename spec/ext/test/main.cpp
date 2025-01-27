@@ -180,6 +180,12 @@ Value Test::test_singleton_method(Value self) {
   self.define_singleton_method("m2", [](Value, int n) { return n * 3; }, arg<int>);
   self.send("assert_equal", 30, self.send("m2", 10));
 
+  {
+    auto str = "test"_str;
+    str.define_singleton_method("foo", [](String s) { return s.send("*", 2); });
+    self.send("assert_equal", "testtest"_str, str.send<String>("foo"));
+  }
+
   return Value::qtrue;
 }
 

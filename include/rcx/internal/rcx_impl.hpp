@@ -389,6 +389,16 @@ namespace rcx {
       }
       throw std::runtime_error{"This object is not managed by Ruby"};
     }
+
+    template <std::derived_from<typed_data::WrappedStructBase> T>
+    inline ClassT<T> FromValue<ClassT<T>>::convert(Value value) {
+      auto cls = from_Value<Class>(value);
+      if(cls.is_subclass_of(typed_data::DataType<T>::bound_class())) {
+        return detail::unsafe_coerce<ClassT<T>>(cls.as_VALUE());
+      }
+      throw Exception::format(builtin::ArgumentError, "Expected a subclass of {} but got {}",
+          typed_data::DataType<T>::bound_class(), cls);
+    }
   }
 
   namespace typed_data {

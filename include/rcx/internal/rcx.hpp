@@ -511,7 +511,7 @@ namespace rcx {
       ClassT<Derived> get_class() const;
       Derived freeze() const;
 
-      template <concepts::ConvertibleFromValue Self = Value, concepts::ArgSpec... ArgSpec>
+      template <concepts::ConvertibleFromValue Self = Derived, concepts::ArgSpec... ArgSpec>
       Derived define_singleton_method(concepts::Identifier auto &&mid,
           std::invocable<Self, typename ArgSpec::ResultType...> auto &&function,
           ArgSpec... argspec) const;
@@ -1191,6 +1191,9 @@ namespace rcx {
     };
     template <std::derived_from<typed_data::TwoWayAssociation> T> struct IntoValue<T> {
       Value convert(T &value);
+    };
+    template <std::derived_from<typed_data::WrappedStructBase> T> struct FromValue<ClassT<T>> {
+      ClassT<T> convert(Value value);
     };
   }
 
