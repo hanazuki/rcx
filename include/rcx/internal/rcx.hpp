@@ -8,7 +8,6 @@
 #include <format>
 #include <functional>
 #include <initializer_list>
-#include <memory>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -854,40 +853,7 @@ namespace rcx {
       bool try_lock() const;
     };
 #endif
-
-    template <std::derived_from<ValueBase> T> class PinnedOpt {
-    protected:
-      struct Storage {
-        // ValueBase has VALUE as its first field.
-        T value;
-
-        Storage(T v);
-        ~Storage();
-        Storage &operator=(Storage const &) = delete;
-      };
-
-      std::shared_ptr<Storage> ptr_;
-
-    public:
-      PinnedOpt() noexcept = default;
-      explicit PinnedOpt(T value);
-      T &operator*() const noexcept;
-      T *RCX_Nullable operator->() const noexcept;
-      operator bool() const noexcept;
-    };
-
-    template <std::derived_from<ValueBase> T> class Pinned: public PinnedOpt<T> {
-    public:
-      Pinned() = rcx_delete("Pinned<T> must always have a value of T; "
-                            "use PinnedOpt<T> instread to allow missing value.");
-      explicit Pinned(T value);
-      T *RCX_Nonnull operator->() const noexcept;
-    };
-
-    template <std::derived_from<ValueBase> T> PinnedOpt(T) -> PinnedOpt<T>;
-    template <std::derived_from<ValueBase> T> Pinned(T) -> Pinned<T>;
   }
-
   /// Built-in classes.
   ///
   namespace builtin {
@@ -1102,8 +1068,8 @@ namespace rcx {
       template <std::derived_from<ValueBase> T> void mark_movable(T &value) const noexcept;
       /// Marks an object as pinned.
       ///
-      /// The object will be marked as pinned. The object will not be moved while this reference is
-      /// alive.
+      /// The object will be marked as pinned. The object will not be moved while this reference
+      /// is alive.
       ///
       /// @param value The object to be marked.
       void mark_pinned(ValueBase value) const noexcept;
@@ -1196,6 +1162,50 @@ namespace rcx {
       ClassT<T> convert(Value value);
     };
   }
+
+  /// Leaking object container.
+  ///
+  /// The contained Ruby object will not be garbage-collected or moved.
+  /// Use this container if you want to store Ruby objects in global variables or static block
+  /// variables.
+  template <std::derived_from<ValueBase> T> class Leak {
+    union {
+      // T has a VALUE as its first field.
+      T value_;
+      VALUE raw_value_;
+    };
+    bool init_;
+
+  public:
+    /// Initializes the container with no value.
+    ///
+    Leak() noexcept;
+    Leak(Leak<T> const &) = rcx_delete("Leak<T> cannot be copied");
+    /// Initializes the container with the given value.
+    ///
+    Leak(T value) noexcept(noexcept(T(value)));
+    Leak<T> &operator=(Leak<T> const &) = rcx_delete("Leak<T> cannot be copied");
+    /// Copies the given value into the container, destroying the existing value if any.
+    ///
+    Leak<T> &operator=(T value) noexcept(noexcept(T(value)));
+    /// Gets the value in the container.
+    ///
+    /// @throw std::runtime_error When the container has no value.
+    T get() const;
+    /// Copies the given value into the container, destroying the existing value if any.
+    ///
+    void set(T value) noexcept(noexcept(T(value)));
+    /// Gets the value in the container.
+    ///
+    /// @throw std::runtime_error When the container has no value.
+    T operator*() const;
+    T const *RCX_Nonnull operator->() const;
+    /// Clears the container.
+    ///
+    /// The value originally in the container will be no longer pinned.
+    void clear() noexcept;
+  };
+  template <std::derived_from<ValueBase> T> Leak(T) -> Leak<T>;
 
   class Ruby {
   public:

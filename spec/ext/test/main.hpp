@@ -22,7 +22,7 @@ struct Test {
   static Value test_const(Value self);
   static Value test_singleton_method(Value self);
   static Value test_array(Value self);
-  static Value test_pinning(Value self);
+  static Value test_leak(Value self);
   static Value test_allocate(Value self);
   static Value test_io_buffer(Value self);
   static Value test_format(Value self);

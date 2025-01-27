@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright 2024-2025 Kasumi Hanazuki <kasumi@rollingapple.net>
 
 #include <concepts>
+#include <memory>
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
@@ -1083,46 +1084,7 @@ namespace rcx {
   }
 #endif
 
-  /// Pinned
-
-  namespace value {
-    template <std::derived_from<ValueBase> T> inline PinnedOpt<T>::Storage::Storage(T v): value{v} {
-      ::rb_gc_register_address(const_cast<VALUE *>(reinterpret_cast<VALUE const *>(&value)));
-    }
-
-    template <std::derived_from<ValueBase> T> inline PinnedOpt<T>::Storage::~Storage() {
-      ::rb_gc_unregister_address(const_cast<VALUE *>(reinterpret_cast<VALUE const *>(&value)));
-    }
-
-    template <std::derived_from<ValueBase> T>
-    inline PinnedOpt<T>::PinnedOpt(T value): ptr_(std::make_shared<Storage>(value)) {
-    }
-
-    template <std::derived_from<ValueBase> T> inline T &PinnedOpt<T>::operator*() const noexcept {
-      return ptr_->value;
-    }
-
-    template <std::derived_from<ValueBase> T>
-    inline T *RCX_Nullable PinnedOpt<T>::operator->() const noexcept {
-      rcx_assert(ptr_);
-      return &ptr_->value;
-    }
-
-    template <std::derived_from<ValueBase> T> inline PinnedOpt<T>::operator bool() const noexcept {
-      return ptr_;
-    }
-
-    template <std::derived_from<ValueBase> T>
-    inline Pinned<T>::Pinned(T value): PinnedOpt<T>(value) {
-    }
-
-    template <std::derived_from<ValueBase> T>
-    inline T *RCX_Nonnull Pinned<T>::operator->() const noexcept {
-      return PinnedOpt<T>::operator->();
-    }
-  }
-
-  /// Array
+  // Array
 
   namespace value {
     inline size_t Array::size() const noexcept {
@@ -1242,7 +1204,7 @@ namespace rcx {
     }(std::make_index_sequence<sizeof...(T)>());
   };
 
-  /// Misc
+  // Misc
 
   namespace literals {
     template <detail::cxstring s> String operator""_str() {
@@ -1285,7 +1247,63 @@ namespace rcx {
 
   }
 
-  /// Ruby
+  // Leak
+
+  template <std::derived_from<ValueBase> T>
+  inline Leak<T>::Leak() noexcept: init_(false), raw_value_(RUBY_Qnil) {
+  }
+
+  template <std::derived_from<ValueBase> T>
+  inline Leak<T>::Leak(T value) noexcept(noexcept(T(value))): Leak() {
+    set(value);
+  }
+
+  template <std::derived_from<ValueBase> T>
+  inline Leak<T> &Leak<T>::operator=(T value) noexcept(noexcept(T(value))) {
+    set(value);
+    return *this;
+  }
+
+  template <std::derived_from<ValueBase> T> inline T Leak<T>::get() const {
+    if(!init_) {
+      throw std::runtime_error{"Leak is not initialized yet"};
+    }
+    return value_;
+  }
+
+  template <std::derived_from<ValueBase> T>
+  inline void Leak<T>::set(T value) noexcept(noexcept(T(value))) {
+    if(init_) {
+      value_.~T();
+    } else {
+      ::rb_gc_register_address(&raw_value_);
+    }
+    new(&value_) T(value);
+    init_ = true;
+  }
+
+  template <std::derived_from<ValueBase> T> inline T Leak<T>::operator*() const {
+    return get();
+  }
+
+  template <std::derived_from<ValueBase> T>
+  inline T const *RCX_Nonnull Leak<T>::operator->() const {
+    if(!init_) {
+      throw std::runtime_error{"Leak is not initialized yet"};
+    }
+    return &value_;
+  }
+
+  template <std::derived_from<ValueBase> T> inline void Leak<T>::clear() noexcept {
+    if(init_) {
+      value_.~T();
+      raw_value_ = RUBY_Qnil;
+      ::rb_gc_unregister_address(&raw_value_);
+      init_ = false;
+    }
+  }
+
+  // Ruby
 
   inline Module Ruby::define_module(concepts::Identifier auto &&name) {
     return builtin::Object.define_module(std::forward<decltype(name)>(name));

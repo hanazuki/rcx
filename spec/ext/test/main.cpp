@@ -16,8 +16,8 @@ using namespace std::literals;
 using namespace rcx::value;
 using namespace rcx::literals;
 
-static std::optional<ClassT<Base>> cBase;
-static std::optional<ClassT<Derived>> cDerived;
+static rcx::Leak<ClassT<Base>> cBase;
+static rcx::Leak<ClassT<Derived>> cDerived;
 
 Value Test::test_nil(Value self) {
   self.send("assert_nil", Value{});
@@ -235,27 +235,14 @@ Value Test::test_array([[maybe_unused]] Value self) {
   return Value::qtrue;
 }
 
-Value Test::test_pinning([[maybe_unused]] Value self) {
-  Class c = Class::new_class();
+Value Test::test_leak([[maybe_unused]] Value self) {
+  static rcx::Leak cls = Class::new_class();
+  auto v = cls->new_instance();
 
-  Pinned v{c};
-  Pinned v1{c};
-  Pinned v2{v1};
-  *v2 = c;
+  cls.clear();
+  cls.set(Class::new_class());
 
-  PinnedOpt<Class> o;
-  o = PinnedOpt<Class>{c};
-  o->new_instance();
-
-  Pinned<Class const> v3(c);
-  Pinned v4{*v3};
-  *v4 = c;
-
-  std::vector<Pinned<String>> ss;
-  for(int i: std::views::iota(0, 20)) {
-    ss.emplace_back(String::copy_from(std::format("puipui{}", i)));
-  }
-  ASSERT_EQ(std::string("puipui0"), std::string_view(*ss[0]));
+  cls = Class::new_class();
 
   return Value::qtrue;
 }
@@ -402,7 +389,7 @@ extern "C" void Init_test() {
                    .define_method("test_ivar", &Test::test_ivar)
                    .define_method("test_const", &Test::test_const)
                    .define_method("test_singleton_method", &Test::test_singleton_method)
-                   .define_method("test_pinning", &Test::test_pinning)
+                   .define_method("test_leak", &Test::test_leak)
                    .define_method("test_allocate", &Test::test_allocate)
                    .define_method("test_io_buffer", &Test::test_io_buffer)
                    .define_method("test_format", &Test::test_format);
