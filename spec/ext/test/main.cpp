@@ -318,6 +318,27 @@ Value Test::test_format([[maybe_unused]] Value self) {
   return Value::qtrue;
 }
 
+Value Test::test_args([[maybe_unused]] Value self) {
+  self.send("skip", "arg_splat is not correctly implemented"_str);
+
+  using namespace rcx::arg;
+  auto cls = Class::new_class();
+  cls.define_method(
+      "args_splat",
+      [self](Value, String str, std::vector<String> ary) {
+        self.send("assert_equal", "foo"_str, str);
+        self.send("assert_equal", "bar"_str, ary[0]);
+        self.send("assert_equal", "baz"_str, ary[1]);
+        return 1;
+      },
+      arg<String>, arg_splat<String>);
+
+  self.send(
+      "assert_equal", 1, cls.new_instance().send("args_splat", "foo"_str, "bar"_str, "baz"_str));
+
+  return Value::qtrue;
+}
+
 Base::Base(String string): string_(std::string_view(string)) {
 }
 
@@ -398,7 +419,8 @@ extern "C" void Init_test() {
                    .define_method("test_leak", &Test::test_leak)
                    .define_method("test_allocate", &Test::test_allocate)
                    .define_method("test_io_buffer", &Test::test_io_buffer)
-                   .define_method("test_format", &Test::test_format);
+                   .define_method("test_format", &Test::test_format)
+                   .define_method("test_args", &Test::test_args);
 
   cBase = ruby.define_class<Base>("Base")
               .define_constructor(arg<String, "string">)

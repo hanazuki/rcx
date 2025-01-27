@@ -270,7 +270,7 @@ namespace rcx {
         values.push_back(from_Value<T>(args.front()));
         args = std::ranges::drop_view(args, 1);
       }
-      return args;
+      return values;
     }
 
     inline Block::ResultType Block::parse(Ruby &, Value, std::span<Value> &) {

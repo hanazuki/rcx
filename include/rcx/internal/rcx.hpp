@@ -328,6 +328,7 @@ namespace rcx {
     };
 
     template <concepts::ConvertibleFromValue T = Value> struct ArgSplat {
+      // FIXME: Storing VALUEs in vector is not safe
       using ResultType = std::vector<detail::wrap_ref_t<T>>;
       static ResultType parse(Ruby &, Value self, std::span<Value> &args);
     };
