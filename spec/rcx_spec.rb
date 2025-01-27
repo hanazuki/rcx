@@ -146,6 +146,13 @@ RSpec.describe 'test ext' do
       expect(ret).to eq 'B'
     end
 
+    specify 'optional block' do
+      obj = Base.new('hello')
+
+      expect(obj.with_block_opt('A')).to eq 'A'
+      expect(obj.with_block_opt('A', &:succ)).to eq 'B'
+    end
+
     specify 'clone' do
       obj = Base.new('hello')
       obj2 = obj.clone

@@ -277,6 +277,13 @@ namespace rcx {
       return detail::unsafe_coerce<Proc>(
           detail::protect([]() noexcept { return ::rb_block_proc(); }));
     }
+
+    inline BlockOpt::ResultType BlockOpt::parse(Ruby &ruby, Value self, std::span<Value> &args) {
+      if(!::rb_block_given_p()) {
+        return std::nullopt;
+      }
+      return block.parse(ruby, self, args);
+    }
   }
 
   namespace convert {

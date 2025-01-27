@@ -43,6 +43,7 @@ public:
   void ruby_exception(Exception e) const;
   void ruby_exception_format(ClassT<Exception> e, String s) const;
   Value with_block(Value x, rcx::Proc block) const;
+  Value with_block_opt(Value x, std::optional<rcx::Proc> block) const;
 };
 
 class Derived: public Base {

@@ -337,13 +337,30 @@ namespace rcx {
       static ResultType parse(Ruby &, Value self, std::span<Value> &args);
     };
 
+    struct BlockOpt {
+      using ResultType = std::optional<Proc>;
+      static ResultType parse(Ruby &, Value self, std::span<Value> &args);
+    };
+
+    /// The method receiver.
+    ///
+    /// The method accepts the method receiver and converts it into type T.
     template <concepts::ConvertibleFromValue T = Value> constexpr inline Self<T> self;
+    /// A positional argument.
+    ///
     template <concepts::ConvertibleFromValue T = Value, detail::cxstring name = "">
     constexpr inline Arg<T, name> arg;
+    /// An optional positional argument.
+    ///
     template <concepts::ConvertibleFromValue T = Value, detail::cxstring name = "">
     constexpr inline ArgOpt<T, name> arg_opt;
+    /// The rest of the positional arguments.
+    ///
     template <concepts::ConvertibleFromValue T = Value> constexpr inline ArgSplat<T> arg_splat;
+    /// Block.
     constexpr inline Block block;
+    /// Optional block.
+    constexpr inline BlockOpt block_opt;
   }
 
   namespace concepts {

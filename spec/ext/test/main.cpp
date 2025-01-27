@@ -354,9 +354,15 @@ void Base::ruby_exception_format(ClassT<Exception> e, String s) const {
 }
 
 Value Base::with_block(Value x, rcx::Proc block) const {
-  return block.call(rcx::Array::new_from({
-    x,
-  }));
+  return block.call(rcx::Array::new_from({x}));
+}
+
+Value Base::with_block_opt(Value x, std::optional<Proc> block) const {
+  if(block) {
+    return block->call(rcx::Array::new_from({x}));
+  } else {
+    return x;
+  }
 }
 
 Derived::Derived(String string): Base(string) {
@@ -406,7 +412,8 @@ extern "C" void Init_test() {
               .define_method_const("ruby_exception", &Base::ruby_exception, arg<Exception>)
               .define_method_const("ruby_exception_format", &Base::ruby_exception_format,
                   arg<ClassT<Exception>>, arg<String>)
-              .define_method_const("with_block", &Base::with_block, arg<Value>, block);
+              .define_method_const("with_block", &Base::with_block, arg<Value>, block)
+              .define_method_const("with_block_opt", &Base::with_block_opt, arg<Value>, block_opt);
 
   cDerived = ruby.define_class<Derived>("Derived", *cBase)
                  .define_copy_constructor()
