@@ -319,19 +319,17 @@ Value Test::test_format([[maybe_unused]] Value self) {
 }
 
 Value Test::test_args([[maybe_unused]] Value self) {
-  self.send("skip", "arg_splat is not correctly implemented"_str);
-
   using namespace rcx::arg;
   auto cls = Class::new_class();
   cls.define_method(
       "args_splat",
-      [self](Value, String str, std::vector<String> ary) {
+      [self](Value, String str, Array ary) {
         self.send("assert_equal", "foo"_str, str);
         self.send("assert_equal", "bar"_str, ary[0]);
         self.send("assert_equal", "baz"_str, ary[1]);
         return 1;
       },
-      arg<String>, arg_splat<String>);
+      arg<String>, arg_splat);
 
   self.send(
       "assert_equal", 1, cls.new_instance().send("args_splat", "foo"_str, "bar"_str, "baz"_str));

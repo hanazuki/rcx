@@ -261,16 +261,10 @@ namespace rcx {
       return arg;
     }
 
-    template <concepts::ConvertibleFromValue T>
-    inline typename ArgSplat<T>::ResultType ArgSplat<T>::parse(
-        Ruby &, Value, std::span<Value> &args) {
-      typename ArgSplat<T>::ResultType values;
-      values.reserve(args.size());
-      while(!args.empty()) {
-        values.push_back(from_Value<T>(args.front()));
-        args = std::ranges::drop_view(args, 1);
-      }
-      return values;
+    inline ArgSplat::ResultType ArgSplat::parse(Ruby &, Value self, std::span<Value> &args) {
+      auto result = Array::new_from(args);
+      args = {};
+      return result;
     }
 
     inline Block::ResultType Block::parse(Ruby &, Value, std::span<Value> &) {

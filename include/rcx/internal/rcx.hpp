@@ -327,9 +327,8 @@ namespace rcx {
       static ResultType parse(Ruby &, Value self, std::span<Value> &args);
     };
 
-    template <concepts::ConvertibleFromValue T = Value> struct ArgSplat {
-      // FIXME: Storing VALUEs in vector is not safe
-      using ResultType = std::vector<detail::wrap_ref_t<T>>;
+    struct ArgSplat {
+      using ResultType = Array;
       static ResultType parse(Ruby &, Value self, std::span<Value> &args);
     };
 
@@ -357,7 +356,7 @@ namespace rcx {
     constexpr inline ArgOpt<T, name> arg_opt;
     /// The rest of the positional arguments.
     ///
-    template <concepts::ConvertibleFromValue T = Value> constexpr inline ArgSplat<T> arg_splat;
+    constexpr inline ArgSplat arg_splat;
     /// Block.
     constexpr inline Block block;
     /// Optional block.
