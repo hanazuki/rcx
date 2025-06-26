@@ -958,6 +958,10 @@ namespace rcx {
     ///
     inline value::ClassT<value::Exception> const Exception =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eException);
+    /// `StandardError` class
+    ///
+    inline value::ClassT<value::Exception> const StandardError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eStandardError);
     /// `SystemExit` class
     ///
     inline value::ClassT<value::Exception> const SystemExit =
@@ -970,30 +974,22 @@ namespace rcx {
     ///
     inline value::ClassT<value::Exception> const SignalException =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSignal);
-    /// `StandardError` class
-    ///
-    inline value::ClassT<value::Exception> const StandardError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eStandardError);
-    /// `RuntimeError` class
-    ///
-    inline value::ClassT<value::Exception> const RuntimeError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eRuntimeError);
-    /// `FrozenError` class
-    ///
-    inline value::ClassT<value::Exception> const FrozenError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eFrozenError);
-    /// `TypeError` class
-    ///
-    inline value::ClassT<value::Exception> const TypeError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eTypeError);
     /// `ArgumentError` class
     ///
     inline value::ClassT<value::Exception> const ArgumentError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eArgError);
+    /// `EOFError` class
+    ///
+    inline value::ClassT<value::Exception> const EOFError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEOFError);
     /// `IndexError` class
     ///
     inline value::ClassT<value::Exception> const IndexError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eIndexError);
+    /// `StopIteration` class
+    ///
+    inline value::ClassT<value::Exception> const StopIteration =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eStopIteration);
     /// `KeyError` class
     ///
     inline value::ClassT<value::Exception> const KeyError =
@@ -1002,26 +998,38 @@ namespace rcx {
     ///
     inline value::ClassT<value::Exception> const RangeError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eRangeError);
-    /// `NameError` class
+    /// `IOError` class
     ///
-    inline value::ClassT<value::Exception> const NameError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNameError);
-    /// `EncodingError` class
+    inline value::ClassT<value::Exception> const IOError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eIOError);
+    /// `RuntimeError` class
     ///
-    inline value::ClassT<value::Exception> const EncodingError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEncodingError);
-    /// `Encoding::CompatibilityError` class
+    inline value::ClassT<value::Exception> const RuntimeError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eRuntimeError);
+    /// `FrozenError` class
     ///
-    inline value::ClassT<value::Exception> const EncodingCompatibilityError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEncCompatError);
-    /// `NoMethodError` class
-    ///
-    inline value::ClassT<value::Exception> const NoMethodError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMethodError);
+    inline value::ClassT<value::Exception> const FrozenError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eFrozenError);
     /// `SecurityError` class
     ///
     inline value::ClassT<value::Exception> const SecurityError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSecurityError);
+    /// `SystemCallError` class
+    ///
+    inline value::ClassT<value::Exception> const SystemCallError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSystemCallError);
+    /// `ThreadError` class
+    ///
+    inline value::ClassT<value::Exception> const ThreadError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eThreadError);
+    /// `TypeError` class
+    ///
+    inline value::ClassT<value::Exception> const TypeError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eTypeError);
+    /// `ZeroDivisionError` class
+    ///
+    inline value::ClassT<value::Exception> const ZeroDivisionError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eZeroDivError);
     /// `NotImplementedError` class
     ///
     inline value::ClassT<value::Exception> const NotImplementedError =
@@ -1030,6 +1038,34 @@ namespace rcx {
     ///
     inline value::ClassT<value::Exception> const NoMemoryError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMemError);
+    /// `NoMethodError` class
+    ///
+    inline value::ClassT<value::Exception> const NoMethodError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNoMethodError);
+    /// `FloatDomainError` class
+    ///
+    inline value::ClassT<value::Exception> const FloatDomainError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eFloatDomainError);
+    /// `LocalJumpError` class
+    ///
+    inline value::ClassT<value::Exception> const LocalJumpError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eLocalJumpError);
+    /// `SystemStackError` class
+    ///
+    inline value::ClassT<value::Exception> const SystemStackError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSysStackError);
+    /// `RegexpError` class
+    ///
+    inline value::ClassT<value::Exception> const RegexpError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eRegexpError);
+    /// `EncodingError` class
+    ///
+    inline value::ClassT<value::Exception> const EncodingError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEncodingError);
+    /// `Encoding::CompatibilityError` class
+    ///
+    inline value::ClassT<value::Exception> const EncodingCompatibilityError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eEncCompatError);
     /// `NoMatchingPatternError` class
     ///
     inline value::ClassT<value::Exception> const NoMatchingPatternError =
@@ -1042,6 +1078,10 @@ namespace rcx {
     ///
     inline value::ClassT<value::Exception> const ScriptError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eScriptError);
+    /// `NameError` class
+    ///
+    inline value::ClassT<value::Exception> const NameError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eNameError);
     /// `SyntaxError` class
     ///
     inline value::ClassT<value::Exception> const SyntaxError =
@@ -1050,10 +1090,10 @@ namespace rcx {
     ///
     inline value::ClassT<value::Exception> const LoadError =
         detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eLoadError);
-    /// `SystemCallError` class
+    /// `Math::DomainError` class
     ///
-    inline value::ClassT<value::Exception> const SystemCallError =
-        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eSystemCallError);
+    inline value::ClassT<value::Exception> const MathDomainError =
+        detail::unsafe_coerce<value::ClassT<value::Exception>>(::rb_eMathDomainError);
 
 #ifdef RCX_IO_BUFFER
     /// `IO::Buffer` class
