@@ -339,10 +339,21 @@ Value Test::test_args([[maybe_unused]] Value self) {
 }
 
 Value Test::test_exception(Value self) {
-  auto exc = rcx::Exception::new_from_errno("test message", EAGAIN);
-  self.send("assert_kind_of", rcx::builtin::SystemCallError, exc);
-  self.send("assert_equal", EAGAIN, exc.send("errno"));
-  self.send("assert_match", rcx::builtin::Regexp.new_instance("test message$"_str), exc.send("message"));
+  {
+    auto exc = rcx::Exception::new_from_errno("test message", EAGAIN);
+    self.send("assert_kind_of", rcx::builtin::SystemCallError, exc);
+    self.send("assert_equal", EAGAIN, exc.send("errno"));
+    self.send("assert_match", rcx::builtin::Regexp.new_instance("test message$"_str),
+        exc.send("message"));
+  }
+
+  {
+    errno = EAGAIN;
+    auto exc = rcx::Exception::new_from_errno();
+    self.send("assert_kind_of", rcx::builtin::SystemCallError, exc);
+    self.send("assert_equal", EAGAIN, exc.send("errno"));
+  }
+
   return Value::qtrue;
 }
 
