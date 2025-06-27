@@ -989,7 +989,7 @@ namespace rcx {
       return cls.new_instance(String::intern_from(msg));
     }
 
-    inline Exception Exception::new_from_errno(char const *RCX_Nonnull message, int err = (::rb_errno)()) {
+    inline Exception Exception::new_from_errno(char const *RCX_Nonnull message, int err) {
       return detail::unsafe_coerce<Exception>(rb_syserr_new(err, message));
     }
   }
