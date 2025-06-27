@@ -17,6 +17,7 @@ module Assertions
   def assert_same(expected, val) = expect(val).to be(expected)
   def assert_send(val, *args) = expect(val.send(*args)).to be_truthy
   def assert_not_predicate(val, *args) = expect(val.send(*args)).to be_falsy
+  def assert_match(matcher, val) = expect(val).to match matcher
 end
 
 RSpec.describe 'test ext' do

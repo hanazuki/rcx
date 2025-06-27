@@ -988,6 +988,10 @@ namespace rcx {
       auto const msg = std::vformat(fmt.get(), std::make_format_args(args...));
       return cls.new_instance(String::intern_from(msg));
     }
+
+    inline Exception Exception::new_from_errno(char const *RCX_Nonnull message, int err = (::rb_errno)()) {
+      return detail::unsafe_coerce<Exception>(rb_syserr_new(err, message));
+    }
   }
 
   namespace convert {

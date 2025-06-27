@@ -803,6 +803,7 @@ namespace rcx {
 
       template <std::derived_from<Exception> E, typename... Args>
       static E format(ClassT<E> cls, std::format_string<Args...> fmt, Args &&...args);
+      static Exception new_from_errno(char const *RCX_Nonnull message, int err);
     };
 
 #ifdef RCX_IO_BUFFER

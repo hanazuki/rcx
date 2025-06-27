@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright 2024-2025 Kasumi Hanazuki <kasumi@rollingapple.net>
 #include "main.hpp"
 
+#include <cerrno>
 #include <cmath>
 #include <limits>
 #include <mutex>
@@ -337,6 +338,14 @@ Value Test::test_args([[maybe_unused]] Value self) {
   return Value::qtrue;
 }
 
+Value Test::test_exception(Value self) {
+  auto exc = rcx::Exception::new_from_errno("test message", EAGAIN);
+  self.send("assert_kind_of", rcx::builtin::SystemCallError, exc);
+  self.send("assert_equal", EAGAIN, exc.send("errno"));
+  self.send("assert_match", rcx::builtin::Regexp.new_instance("test message$"_str), exc.send("message"));
+  return Value::qtrue;
+}
+
 Base::Base(String string): string_(std::string_view(string)) {
 }
 
@@ -418,7 +427,8 @@ extern "C" void Init_test() {
                    .define_method("test_allocate", &Test::test_allocate)
                    .define_method("test_io_buffer", &Test::test_io_buffer)
                    .define_method("test_format", &Test::test_format)
-                   .define_method("test_args", &Test::test_args);
+                   .define_method("test_args", &Test::test_args)
+                   .define_method("test_exception", &Test::test_exception);
 
   cBase = ruby.define_class<Base>("Base")
               .define_constructor(arg<String, "string">)
