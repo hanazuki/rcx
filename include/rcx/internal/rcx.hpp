@@ -803,7 +803,13 @@ namespace rcx {
 
       template <std::derived_from<Exception> E, typename... Args>
       static E format(ClassT<E> cls, std::format_string<Args...> fmt, Args &&...args);
-      static Exception new_from_errno(char const *RCX_Nonnull message, int err = errno);
+
+      /// Creates a `SystemCallError` from an errno value.
+      ///
+      /// @param message An optional message to be appended to the error message.
+      /// @param err The errno value.
+      /// @return The newly created `SystemCallError`.
+      static Exception new_from_errno(char const *RCX_Nullable message = nullptr, int err = errno);
     };
 
 #ifdef RCX_IO_BUFFER
