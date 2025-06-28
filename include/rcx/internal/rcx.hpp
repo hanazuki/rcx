@@ -358,8 +358,10 @@ namespace rcx {
     ///
     constexpr inline ArgSplat arg_splat;
     /// Block.
+    ///
     constexpr inline Block block;
     /// Optional block.
+    ///
     constexpr inline BlockOpt block_opt;
   }
 
@@ -725,36 +727,90 @@ namespace rcx {
       template <typename S> static ClassT<S> new_class(ClassT<S> superclass);
     };
 
+    /// Represents a Ruby `Symbol`.
+    ///
+    /// A `Symbol` object represents a name inside the Ruby interpreter.
     class Symbol: public ValueT<Symbol, Value> {
     public:
       using ValueT<Symbol, Value>::ValueT;
-      template <size_t N> explicit Symbol(char const (&)[N]) noexcept;
+
+      /// Creates a `Symbol` from a C string literal.
+      ///
+      /// @param s The C string literal.
+      template <size_t N> explicit Symbol(char const (&s)[N]) noexcept;
+
+      /// Creates a `Symbol` from a string view.
+      ///
+      /// @param sv The string view.
       explicit Symbol(std::string_view sv) noexcept;
 
-      /**
-       * Returns Ruby-internal ID.
-       *
-       * The ID returned by this method may be dynamic and subject to garbage collection.
-       * So do not store, whether on stack or in heap.
-       */
+      /// Returns Ruby-internal ID.
+      ///
+      /// @warning The ID returned by this method may be dynamic and subject to garbage collection.
+      /// So do not store, whether on stack or in heap.
+      /// @return The Ruby-internal ID.
       ID as_ID() const noexcept;
     };
 
+    /// Represents a Ruby `String`.
+    ///
     class String: public ValueT<String, Value> {
     public:
       using ValueT<String, Value>::ValueT;
 
+      /// Creates a deduped frozen `String` from a C++ string-like object.
+      ///
+      /// @param s The C++ string-like object.
+      /// @return The created deduped frozen `String`.
       template <concepts::StringLike S> static String intern_from(S &&s);
+
+      /// Creates a deduped frozen `String` from a C string.
+      ///
+      /// @param s The C string.
+      /// @return The created deduped frozen `String`.
       template <concepts::CharLike CharT> static String intern_from(CharT const *RCX_Nonnull s);
+
+      /// Creates a mutable `String` from a C++ string-like object.
+      ///
+      /// @param s The C++ string-like object.
+      /// @return The created mutable `String`.
       template <concepts::StringLike S> static String copy_from(S &&s);
+
+      /// Creates a mutable `String` from a C string.
+      ///
+      /// @param s The C string.
+      /// @return The created mutable `String`.
       template <concepts::CharLike CharT> static String copy_from(CharT const *RCX_Nonnull s);
 
+      /// Returns the length of the string in octets.
+      ///
+      /// @return The length of the string in octets.
       size_t size() const noexcept;
+
+      /// Returns a mutable pointer to the string's content.
+      ///
+      /// @return A mutable pointer to the string's content.
+      /// @throws FrozenError When the string is frozen.
       char *RCX_Nonnull data() const;
+
+      /// Returns a const pointer to the string's content.
+      ///
+      /// @return A const pointer to the string's content.
       char const *RCX_Nonnull cdata() const noexcept;
+
+      /// Returns a string view of the string's content.
+      ///
+      /// @return A string view of the string's content.
       explicit operator std::string_view() const noexcept;
 
+      /// Locks the string to prevent it from being freed or relocated.
+      ///
+      /// @return The locked string.
       String lock() const;
+
+      /// Unlocks the string to allow it to be modified.
+      ///
+      /// @return The unlocked string.
       String unlock() const;
     };
 
