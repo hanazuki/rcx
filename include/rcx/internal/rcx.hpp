@@ -814,14 +814,34 @@ namespace rcx {
       String unlock() const;
     };
 
+    /// Represents a Ruby `Array`.
+    ///
     class Array: public ValueT<Array, Value> {
     public:
       using ValueT<Array, Value>::ValueT;
 
+      /// Returns the number of elements in the array.
+      ///
+      /// @return The number of elements in the array.
       size_t size() const noexcept;
+
+      /// Returns the element at the given index.
+      ///
+      /// @tparam T The type to convert the element to.
+      /// @param i The index of the element.
+      /// @return The element at the given index.
       template <concepts::ConvertibleFromValue T = Value> decltype(auto) at(size_t i) const;
+
+      /// Returns the element at the given index.
+      ///
+      /// @param i The index of the element.
+      /// @return The element at the given index.
       Value operator[](size_t i) const;
 
+      /// Creates a new `Array` from a contiguous range of values.
+      ///
+      /// @param elements The contiguous range of values.
+      /// @return The new `Array`.
       template <std::ranges::contiguous_range R>
 #ifdef HAVE_STD_IS_LAYOUT_COMPATIBLE
         requires std::is_layout_compatible_v<std::ranges::range_value_t<R>, ValueBase>
@@ -831,17 +851,52 @@ namespace rcx {
 #endif
       static Array new_from(R const &elements);
 
+      /// Creates a new `Array` from an initializer list of values.
+      ///
+      /// @param elements The initializer list of values.
+      /// @return The new `Array`.
       static Array new_from(std::initializer_list<ValueBase> elements);
 
+      /// Creates a new `Array` from a tuple of values.
+      ///
+      /// @param elements The tuple of values.
+      /// @return The new `Array`.
       template <std::derived_from<ValueBase>... T>
       static Array new_from(std::tuple<T...> const &elements);
 
+      /// Creates a new empty `Array`.
+      ///
+      /// @return The new empty `Array`.
       static Array new_array();
+
+      /// Creates a new empty `Array` with the given capacity.
+      ///
+      /// @param capacity The capacity of the new `Array`.
+      /// @return The new empty `Array`.
       static Array new_array(long capacity);
 
+      /// Appends a value to the end of the array.
+      ///
+      /// @param value The value to append.
+      /// @return The array itself.
       template <concepts::ConvertibleIntoValue T = Value> Array push_back(T value) const;
+
+      /// Removes and returns the last element of the array.
+      ///
+      /// @tparam T The type to convert the element to.
+      /// @return The last element of the array.
       template <concepts::ConvertibleFromValue T = Value> T pop_back() const;
+
+      /// Prepends a value to the beginning of the array.
+      ///
+      /// @param value The value to prepend.
+      /// @return The array itself.
       template <concepts::ConvertibleIntoValue T = Value> Array push_front(T value) const;
+
+      /// Removes and returns the first element of the array.
+      ///
+      /// @tparam T The type to convert the element to.
+      /// @return The first element of the array.
       template <concepts::ConvertibleFromValue T = Value> T pop_front() const;
     };
 
