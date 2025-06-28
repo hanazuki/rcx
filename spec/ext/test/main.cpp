@@ -357,6 +357,30 @@ Value Test::test_exception(Value self) {
   return Value::qtrue;
 }
 
+Value Test::test_io(Value self) {
+  {
+    auto io = self.send<IO>("eval"_sym, "File.open('/dev/null', 'w+')"_str);
+    self.send("assert_kind_of"_sym, rcx::builtin::IO, io);
+    self.send("assert_kind_of"_sym, rcx::builtin::Integer, io.descriptor());
+    io.check_readable();
+    io.check_writable();
+  }
+
+  {
+    // Test when not readable
+    auto io = self.send<IO>("eval"_sym, "File.open('/dev/null', 'w')"_str);
+    ASSERT_RAISE([&] { io.check_readable(); });
+  }
+
+  {
+    // Test when not writable
+    auto io = self.send<IO>("eval"_sym, "File.open('/dev/null', 'r')"_str);
+    ASSERT_RAISE([&] { io.check_writable(); });
+  }
+
+  return Value::qtrue;
+}
+
 Base::Base(String string): string_(std::string_view(string)) {
 }
 
@@ -439,7 +463,8 @@ extern "C" void Init_test() {
                    .define_method("test_io_buffer", &Test::test_io_buffer)
                    .define_method("test_format", &Test::test_format)
                    .define_method("test_args", &Test::test_args)
-                   .define_method("test_exception", &Test::test_exception);
+                   .define_method("test_exception", &Test::test_exception)
+                   .define_method("test_io", &Test::test_io);
 
   cBase = ruby.define_class<Base>("Base")
               .define_constructor(arg<String, "string">)

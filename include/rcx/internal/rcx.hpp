@@ -60,6 +60,7 @@ namespace rcx {
 #ifdef RCX_IO_BUFFER
     class IOBuffer;
 #endif
+    class IO;
   }
   using namespace value;
 
@@ -256,6 +257,9 @@ namespace rcx {
       IOBuffer convert(Value value);
     };
 #endif
+    template <> struct FromValue<IO> {
+      IO convert(Value value);
+    };
 
 #define RCX_DECLARE_CLASS_CONV(CLS)                                                                \
   template <> struct FromValue<ClassT<CLS>> {                                                      \
@@ -269,6 +273,7 @@ namespace rcx {
     RCX_DECLARE_CLASS_CONV(String);
     RCX_DECLARE_CLASS_CONV(Array);
     RCX_DECLARE_CLASS_CONV(Exception);
+    RCX_DECLARE_CLASS_CONV(IO);
 #ifdef RCX_IO_BUFFER
     RCX_DECLARE_CLASS_CONV(IOBuffer);
 #endif
@@ -923,8 +928,32 @@ namespace rcx {
       static Exception new_from_errno(char const *RCX_Nullable message = nullptr, int err = errno);
     };
 
+    /// Represents a Ruby `IO`.
+    ///
+    class IO: public ValueT<IO, Value> {
+    public:
+      using ValueT<IO, Value>::ValueT;
+
+      /// The file descriptor of the IO object.
+      ///
+      /// @return The file descriptor.
+      /// @throws IOError If file IO object is closed.
+      int descriptor() const;
+
+      /// Checks if the IO object is opened for reading.
+      ///
+      /// @throws IOError If the IO object is not readable.
+      void check_readable() const;
+
+      /// Checks if the IO object is opened for writing.
+      ///
+      /// @throws IOError If the IO object is not writable.
+      void check_writable() const;
+    };
+
 #ifdef RCX_IO_BUFFER
     /// Represents an `IO::Buffer` object.
+    ///
     class IOBuffer: public ValueT<IOBuffer, Value> {
     public:
       using ValueT<IOBuffer, Value>::ValueT;

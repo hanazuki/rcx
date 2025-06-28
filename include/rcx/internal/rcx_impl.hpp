@@ -13,6 +13,7 @@
 
 #include <ffi.h>
 #include <rcx/internal/rcx.hpp>
+#include <ruby/io.h>
 
 #if HAVE_CXXABI_H
 #include <cxxabi.h>
@@ -955,7 +956,7 @@ namespace rcx {
     return std::string_view(from_Value<String>(value));
   }
 
-  /// Proc
+  // Proc
 
   namespace value {
     inline bool Proc::is_lambda() const {
@@ -980,7 +981,7 @@ namespace rcx {
     };
   }
 
-  /// Exception
+  // Exception
 
   namespace value {
     template <std::derived_from<Exception> E, typename... Args>
@@ -1001,6 +1002,40 @@ namespace rcx {
             builtin::TypeError, "Expected an Exception but got a {}", value.get_class());
       }
       return detail::unsafe_coerce<Exception>(value.as_VALUE());
+    }
+  }
+
+  // IO
+
+  namespace value {
+    inline int IO::descriptor() const {
+      return detail::protect([this]() noexcept { return rb_io_descriptor(as_VALUE()); });
+    }
+
+    inline void IO::check_readable() const {
+      return detail::protect([this]() noexcept {
+        rb_io_t *pio;
+        RB_IO_POINTER(as_VALUE(), pio);
+        rb_io_check_readable(pio);
+      });
+    }
+
+    inline void IO::check_writable() const {
+      return detail::protect([this]() noexcept {
+        rb_io_t *pio;
+        RB_IO_POINTER(as_VALUE(), pio);
+        rb_io_check_writable(pio);
+      });
+    }
+  }
+
+  namespace convert {
+    inline IO FromValue<IO>::convert(Value value) {
+      if(!value.is_kind_of(builtin::IO)) {
+        throw Exception::format(
+            builtin::TypeError, "Expected an IO but got a {}", value.get_class());
+      }
+      return detail::unsafe_coerce<IO>(value.as_VALUE());
     }
   }
 
