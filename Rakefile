@@ -39,6 +39,6 @@ task :yarn_install do
 end
 
 desc 'Format the source code'
-task :format => FileList['include/**/*.hpp'] do |t|
+task :format => FileList['**/*.hpp'] do |t|
   sh 'clang-format', '-i', *t.prerequisites
 end
