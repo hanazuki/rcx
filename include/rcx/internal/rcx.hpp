@@ -1462,6 +1462,9 @@ namespace rcx {
   /// Provides access to Ruby's environment.
   ///
   class Ruby {
+  private:
+    Ruby() = default;
+
   public:
     /// Defines a module at the top level.
     ///
@@ -1500,19 +1503,23 @@ namespace rcx {
     /// @param name Name of the class to define.
     /// @return The newly defined class.
     template <typename T = Value> ClassT<T> define_class(concepts::Identifier auto &&name);
+
+    /// Gets the Ruby environment without GVL checking.
+    ///
+    /// @warning This method bypasses GVL checking and should only be used
+    /// when you are certain the GVL is held or when calling from Ruby callbacks.
+    /// @return Reference to the Ruby environment instance.
+    static Ruby &unsafe_get();
+
+    /// Gets the Ruby environment with GVL checking.
+    ///
+    /// This method asserts that the Global VM Lock is held before returning
+    /// the Ruby environment instance. This is the recommended way to access
+    /// the Ruby environment from C++ code.
+    ///
+    /// @return Reference to the Ruby environment instance.
+    static Ruby &get();
   };
-
-  namespace detail {
-    inline Ruby &unsafe_ruby() {
-      static Ruby ruby = {};
-      return ruby;
-    }
-
-    inline Ruby &ruby() {
-      // TODO: check gvl
-      return unsafe_ruby();
-    }
-  }
 }
 
 namespace std {

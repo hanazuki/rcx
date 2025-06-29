@@ -447,7 +447,7 @@ std::tuple<Associated const &, Associated const &> Associated::swap(
 extern "C" void Init_test() {
   using namespace rcx::arg;
 
-  auto &ruby = rcx::detail::ruby();
+  auto &ruby = rcx::Ruby::get();
 
   [[maybe_unused]]
   auto mTest = ruby.define_module("Test")

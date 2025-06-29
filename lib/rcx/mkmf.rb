@@ -52,3 +52,5 @@ if checking_for("nullability extension")  {
   }
   $defs.push("-DHAVE_FEATURE_NULLABILITY=1")
 end
+
+have_func('ruby_thread_has_gvl_p', 'ruby/thread.h')
