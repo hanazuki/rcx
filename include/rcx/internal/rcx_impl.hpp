@@ -119,12 +119,12 @@ namespace rcx {
       template <typename F> static NativeRbFunc *RCX_Nonnull alloc(F &&function) {
         return alloc_callback([function](std::span<Value> args, Value self) -> Value {
           Parser<ArgSpec...> parser{args, self};
-          using Result = decltype(parser.parse(detail::unsafe_ruby(), std::move(function)));
+          using Result = decltype(parser.parse(Ruby::unsafe_get(), std::move(function)));
           if constexpr(std::is_void_v<Result>) {
-            parser.parse(detail::unsafe_ruby(), std::move(function));
+            parser.parse(Ruby::unsafe_get(), std::move(function));
             return {};
           } else {
-            return into_Value<Result>(parser.parse(detail::unsafe_ruby(), function));
+            return into_Value<Result>(parser.parse(Ruby::unsafe_get(), function));
           }
         });
       }
@@ -1321,6 +1321,18 @@ namespace rcx {
 
   template <typename T> inline ClassT<T> Ruby::define_class(concepts::Identifier auto &&name) {
     return define_class<T>(std::forward<decltype(name)>(name), builtin::Object);
+  }
+
+  inline Ruby &Ruby::unsafe_get() {
+    static Ruby ruby = {};
+    return ruby;
+  }
+
+  inline Ruby &Ruby::get() {
+#ifdef HAVE_RUBY_THREAD_HAS_GVL_P
+    rcx_assert(::ruby_thread_has_gvl_p() && "GVL must be held when calling Ruby APIs");
+#endif
+    return unsafe_get();
   }
 
   namespace detail {

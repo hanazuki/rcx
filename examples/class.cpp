@@ -5,7 +5,7 @@
 void Init_examples_class() {
   using namespace rcx::arg;
 
-  auto ruby = rcx::Ruby();
+  auto ruby = rcx::Ruby::get();
   auto cls =
       ruby.define_class("Example")
           .define_method(
