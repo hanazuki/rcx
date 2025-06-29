@@ -900,25 +900,52 @@ namespace rcx {
       template <concepts::ConvertibleFromValue T = Value> T pop_front() const;
     };
 
+    /// Represents a Ruby `Proc`.
+    ///
     class Proc: public ValueT<Proc, Value> {
     public:
       using ValueT<Proc, Value>::ValueT;
 
+      /// Checks if this `Proc` is a lambda.
+      ///
+      /// @return `true` if this `Proc` is a lambda, `false` otherwise.
       bool is_lambda() const;
+
+      /// Calls this `Proc` with the given arguments.
+      ///
+      /// @param args The arguments to pass to the `Proc`.
+      /// @return The result of calling the `Proc`.
       Value call(Array args) const;
     };
 
+    /// Represents a Ruby exception.
+    ///
+    /// This class provides functionality for creating and formatting exceptions in Ruby.
     class Exception: public ValueT<Exception, Value> {
     public:
       using ValueT<Exception, Value>::ValueT;
 
+      /// Creates a formatted exception of the specified type.
+      ///
+      /// This method creates an exception instance with a formatted message using C++20 std::format
+      /// syntax. The message is created as a frozen string and passed to the exception constructor.
+      ///
+      /// @tparam E The type of exception class (must be derived from Exception).
+      /// @tparam Args The argument types for the format string.
+      /// @param cls The exception class to instantiate.
+      /// @param fmt The format string (follows std::format syntax).
+      /// @param args The arguments to format into the string.
+      /// @return A new exception instance with the formatted message.
       template <std::derived_from<Exception> E, typename... Args>
       static E format(ClassT<E> cls, std::format_string<Args...> fmt, Args &&...args);
 
       /// Creates a `SystemCallError` from an errno value.
       ///
+      /// This method creates a SystemCallError exception based on the provided errno value.
+      /// The errno is converted to an appropriate Ruby exception message automatically.
+      ///
       /// @param message An optional message to be appended to the error message.
-      /// @param err The errno value.
+      /// @param err The errno value (defaults to the current errno).
       /// @return The newly created `SystemCallError`.
       static Exception new_from_errno(char const *RCX_Nullable message = nullptr, int err = errno);
     };
