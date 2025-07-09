@@ -625,8 +625,9 @@ namespace rcx {
     inline R Value::send(
         concepts::Identifier auto &&mid, concepts::ConvertibleIntoValue auto &&...args) const {
       return from_Value<R>(detail::unsafe_coerce<Value>(detail::protect([&]() noexcept {
-        return ::rb_funcall(as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)),
-            sizeof...(args), into_Value(std::forward<decltype(args)>(args)).as_VALUE()...);
+        VALUE const argsv[] = {into_Value(std::forward<decltype(args)>(args)).as_VALUE()...};
+        return ::rb_funcallv(
+            as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), sizeof...(args), argsv);
       })));
     }
 
