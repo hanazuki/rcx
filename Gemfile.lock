@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rcx (0.2.0)
+    rcx (0.2.1)
       shellwords (~> 0.2)
 
 GEM
