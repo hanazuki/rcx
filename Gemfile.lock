@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rcx (0.1.0)
+    rcx (0.2.0)
       shellwords (~> 0.2)
 
 GEM
@@ -37,4 +37,4 @@ DEPENDENCIES
   rspec (~> 3.0)
 
 BUNDLED WITH
-   2.6.0.dev
+   2.6.9
