@@ -3,6 +3,7 @@
 
 #include <concepts>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
@@ -10,6 +11,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+#include <variant>
 
 #include <ffi.h>
 #include <rcx/internal/rcx.hpp>
@@ -1413,5 +1415,106 @@ namespace rcx {
         }
       }
     }
+  }
+
+  namespace gvl {
+    template <std::invocable<> F, std::invocable<> U>
+    auto without_gvl(F callback, std::optional<U> ubf, ReleaseFlags flags) noexcept(noexcept(
+        callback(), (*ubf)())) -> std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, bool,
+        std::optional<std::invoke_result_t<F>>> {
+
+      using ResultType = std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, std::monostate,
+          std::optional<std::invoke_result_t<F>>>;
+
+      struct CallbackData {
+        F callback;
+        [[no_unique_address]] ResultType result;
+        std::exception_ptr exception;
+      };
+
+      struct UbfData {
+        U ubf;
+        std::exception_ptr exception;
+      };
+
+      CallbackData data{std::move(callback), ResultType{}, nullptr};
+      std::optional<UbfData> ubf_data;
+      if(ubf) {
+        ubf_data.emplace(std::move(*ubf), nullptr);
+      }
+
+      auto callback_wrapper = [](void *RCX_Nonnull arg) -> void * {
+        auto &data = *static_cast<CallbackData * RCX_Nonnull>(arg);
+        try {
+          if constexpr(std::is_void_v<std::invoke_result_t<F>>) {
+            data.callback();
+          } else {
+            data.result = data.callback();
+          }
+        } catch(...) {
+          data.exception = std::current_exception();
+        }
+        return reinterpret_cast<void *>(1);  // Non-null to indicate execution
+      };
+
+      using Ubf = void (*RCX_Nullable)(void *RCX_Nonnull);
+      Ubf ubf_wrapper = nullptr;
+      if(ubf_data) {
+        ubf_wrapper = [](void *RCX_Nonnull arg) -> void {
+          auto &data = *static_cast<UbfData * RCX_Nonnull>(arg);
+          try {
+            data.ubf();
+          } catch(...) {
+            data.exception = std::current_exception();
+          }
+        };
+      }
+
+      void *result = rb_nogvl(callback_wrapper, &data, ubf_wrapper,
+          ubf_data ? std::addressof(*ubf_data) : nullptr, static_cast<int>(flags));
+
+      // Check for UBF exceptions first. The callback was cancelled with UBF, which then raised.
+      if(ubf_data && ubf_data->exception) {
+        std::rethrow_exception(ubf_data->exception);
+      }
+
+      // If rb_nogvl returned nullptr, the callback was cancelled.
+      if(result == nullptr) {
+        if constexpr(std::is_void_v<std::invoke_result_t<F>>) {
+          return false;
+        } else {
+          return std::nullopt;
+        }
+      }
+
+      // Re-throw any exception that occurred in the callback.
+      if(data.exception) {
+        std::rethrow_exception(data.exception);
+      }
+
+      // Return the callback result.
+      if constexpr(std::is_void_v<std::invoke_result_t<F>>) {
+        return true;
+      } else {
+        return std::move(data.result);
+      }
+    }
+
+    template <std::invocable<> F, std::invocable<> U>
+    auto without_gvl(F &&callback, U ubf, ReleaseFlags flags) noexcept(noexcept(callback(), ubf()))
+        -> std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, bool,
+            std::optional<std::invoke_result_t<F>>> {
+      return without_gvl(
+          std::forward<F>(callback), std::optional<std::remove_cvref_t<U>>(std::move(ubf)), flags);
+    }
+
+    template <std::invocable<> F>
+    auto without_gvl(F &&callback, ReleaseFlags flags) noexcept(noexcept(callback()))
+        -> std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, bool,
+            std::optional<std::invoke_result_t<F>>> {
+      using DefaultUbf = void (*)();
+      return without_gvl(std::forward<F>(callback), std::optional<DefaultUbf>(std::nullopt), flags);
+    }
+
   }
 }

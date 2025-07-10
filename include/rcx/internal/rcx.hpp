@@ -14,11 +14,11 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
-#include <vector>
 
 #include <ruby.h>
 #include <ruby/encoding.h>
 #include <ruby/io/buffer.h>
+#include <ruby/thread.h>
 
 #define rcx_assert(expr) assert((expr))
 #define rcx_delete(reason) delete
@@ -1520,6 +1520,79 @@ namespace rcx {
     /// @return Reference to the Ruby environment instance.
     static Ruby &get();
   };
+
+  /// Global VM Lock (GVL) management.
+  ///
+  namespace gvl {
+    /// Flags for controlling GVL release behavior.
+    ///
+    enum class ReleaseFlags : int {
+      /// Default behavior - allow interrupts and no special handling.
+      None = 0,
+      /// Prevent interrupt checking during execution.
+      /// Use this when interrupts could cause problems with your function's execution.
+      IntrFail = 1,
+      /// The unblock function (if provided) is async-signal-safe.
+      UbfAsyncSafe = 2,
+      /// The function is safe to offload to a background thread or work pool.
+      Offloadable = 4
+    };
+
+    /// Bitwise OR operator for ReleaseFlags.
+    constexpr ReleaseFlags operator|(ReleaseFlags lhs, ReleaseFlags rhs) noexcept {
+      return static_cast<ReleaseFlags>(static_cast<int>(lhs) | static_cast<int>(rhs));
+    }
+
+    /// Bitwise AND operator for ReleaseFlags.
+    constexpr ReleaseFlags operator&(ReleaseFlags lhs, ReleaseFlags rhs) noexcept {
+      return static_cast<ReleaseFlags>(static_cast<int>(lhs) & static_cast<int>(rhs));
+    }
+
+    /// Releases the GVL and executes a function.
+    ///
+    /// This function releases the Global VM Lock (GVL) before executing the
+    /// callback, allowing other Ruby threads to run concurrently.
+    ///
+    /// @warning The callback must not call any Ruby C API functions that may touch Ruby
+    /// objects.
+    ///
+    /// @tparam F The type of the callback function.
+    /// @tparam U The type of the unblock function.
+    /// @param callback The function to execute without the GVL.
+    /// @param ubf An optional unblock function to interrupt the callback
+    ///   execution. This function can be called from another thread.
+    /// @param flags Control flags for the GVL release behavior.
+    /// @return When the callback returns `void`, this function returns `true` if the callback
+    ///   was executed completely, or `false` if it was interrupted by `ubf`.
+    ///   When the callback returns a value, this function returns an `std::optional` containing
+    ///   the result if the callback was executed completely, or `std::nullopt`
+    ///   if it was interrupted.
+    template <std::invocable<> F, std::invocable U>
+    auto without_gvl(F callback, std::optional<U> ubf, ReleaseFlags flags) noexcept(noexcept(
+        callback(), (*ubf)())) -> std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, bool,
+        std::optional<std::invoke_result_t<F>>>;
+
+    /// Releases the GVL and executes a function.
+    ///
+    /// This is an overload of `without_gvl` that does not take an unblock
+    /// function.
+    ///
+    /// @warning The callback must not call any Ruby C API functions that may touch Ruby
+    /// objects.
+    ///
+    /// @tparam F The type of the callback function.
+    /// @param callback The function to execute without the GVL.
+    /// @param flags Control flags for the GVL release behavior.
+    /// @return When the callback returns `void`, this function returns `true` if the callback
+    ///   was executed completely, or `false` if it was interrupted.
+    ///   When the callback returns a value, this function returns an `std::optional` containing
+    ///   the result if the callback was executed completely, or `std::nullopt`
+    ///   if it was interrupted.
+    template <std::invocable<> F>
+    auto without_gvl(F &&callback, ReleaseFlags flags) noexcept(noexcept(callback()))
+        -> std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, bool,
+            std::optional<std::invoke_result_t<F>>>;
+  }
 }
 
 namespace std {

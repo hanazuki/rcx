@@ -439,6 +439,57 @@ Associated &Associated::return_self() {
   return *this;
 }
 
+Value Test::test_gvl(Value self) {
+  // Test basic functionality with void return type (returns bool)
+  bool void_executed = rcx::gvl::without_gvl([]() {
+    // This callback should execute successfully
+  }, rcx::gvl::ReleaseFlags::None);
+  self.send("assert", void_executed);
+
+  // Test with return value (returns std::optional<T>)
+  auto result = rcx::gvl::without_gvl([]() {
+    return 42;
+  }, rcx::gvl::ReleaseFlags::None);
+  self.send("assert", result.has_value());
+  self.send("assert_equal", 42, result.value());
+
+  // Test with flags using 2-parameter overload
+  auto string_result = rcx::gvl::without_gvl([]() {
+    return std::string("Hello from without GVL!");
+  }, rcx::gvl::ReleaseFlags::None);
+  self.send("assert", string_result.has_value());
+  self.send("assert_equal", String::copy_from("Hello from without GVL!"), String::copy_from(string_result.value()));
+
+  // Test flag combinations using 2-parameter overload
+  auto flag_result = rcx::gvl::without_gvl([]() {
+    return 123;
+  }, rcx::gvl::ReleaseFlags::IntrFail | rcx::gvl::ReleaseFlags::Offloadable);
+  self.send("assert", flag_result.has_value());
+  self.send("assert_equal", 123, flag_result.value());
+
+  // Test with UBF
+  bool ubf_called = false;
+  auto ubf = [&ubf_called]() {
+    ubf_called = true;
+  };
+  
+  auto ubf_result = rcx::gvl::without_gvl([]() {
+    return 456;
+  }, ubf, rcx::gvl::ReleaseFlags::None);
+  self.send("assert", ubf_result.has_value());
+  self.send("assert_equal", 456, ubf_result.value());
+  // Note: UBF may or may not be called depending on timing, so we don't assert on ubf_called
+
+  // Test with both UBF and flags
+  auto both_result = rcx::gvl::without_gvl([]() {
+    return 789;
+  }, [](){ /* UBF function */ }, rcx::gvl::ReleaseFlags::Offloadable);
+  self.send("assert", both_result.has_value());
+  self.send("assert_equal", 789, both_result.value());
+
+  return Value::qtrue;
+}
+
 std::tuple<Associated const &, Associated const &> Associated::swap(
     Value, std::tuple<Associated const &, Associated const &> arr) {
   return {std::ref(std::get<1>(arr)), std::ref(std::get<0>(arr))};
@@ -464,7 +515,8 @@ extern "C" void Init_test() {
                    .define_method("test_format", &Test::test_format)
                    .define_method("test_args", &Test::test_args)
                    .define_method("test_exception", &Test::test_exception)
-                   .define_method("test_io", &Test::test_io);
+                   .define_method("test_io", &Test::test_io)
+                   .define_method("test_gvl", &Test::test_gvl);
 
   cBase = ruby.define_class<Base>("Base")
               .define_constructor(arg<String, "string">)
