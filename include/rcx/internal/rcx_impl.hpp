@@ -1516,5 +1516,8 @@ namespace rcx {
       return without_gvl(std::forward<F>(callback), std::optional<DefaultUbf>(std::nullopt), flags);
     }
 
+    inline void check_interrupts() {
+      detail::protect([]() noexcept { ::rb_thread_check_ints(); });
+    }
   }
 }
