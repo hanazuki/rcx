@@ -1592,6 +1592,9 @@ namespace rcx {
     auto without_gvl(F &&callback, ReleaseFlags flags) noexcept(noexcept(callback()))
         -> std::conditional_t<std::is_void_v<std::invoke_result_t<F>>, bool,
             std::optional<std::invoke_result_t<F>>>;
+
+    /// Checks for pending interrupts.
+    void check_interrupts();
   }
 }
 
