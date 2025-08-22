@@ -264,7 +264,7 @@ namespace rcx {
       return arg;
     }
 
-    inline ArgSplat::ResultType ArgSplat::parse(Ruby &, Value self, std::span<Value> &args) {
+    inline ArgSplat::ResultType ArgSplat::parse(Ruby &, Value, std::span<Value> &args) {
       auto result = Array::new_from(args);
       args = {};
       return result;
