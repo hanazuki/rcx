@@ -6,9 +6,7 @@ Write Ruby extensions in C++20. Inspired by [rice](https://github.com/ruby-rice/
 ## Creating a new extension
 In your `extconf.rb` file, add the following:
 ```ruby
-require 'mkmf
-$CXXFLAGS += ' -std=c++20' # or newer
-require 'rcx/mkmf'
+require 'rcx/mkmf/c++20'
 
 create_header
 create_makefile('your_ext')

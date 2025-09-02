@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: BSL-1.0
 # SPDX-FileCopyrightText: Copyright 2024-2025 Kasumi Hanazuki <kasumi@rollingapple.net>
-require 'mkmf'
-$CXXFLAGS << ' --std=c++20'
-require 'rcx/mkmf'
 
-$CXXFLAGS << ' -g3'
+require 'rcx/mkmf/c++20'
 
 %w[
+  -g3
   -Werror=return-type
   -Werror=nullability-completeness
 ].each do |f|
