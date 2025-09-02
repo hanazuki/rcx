@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+## v0.3.1 (2025-09-02)
+- Now `extconf.rb`'s can only `require 'rcx/mkmf/c++20'` to enable RCX.
+
 ## v0.3.0 (2025-08-22)
 - Added `rcx::gvl::without_gvl`
 
