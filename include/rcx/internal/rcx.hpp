@@ -67,6 +67,10 @@ namespace rcx {
   /// Concepts
   ///
   namespace concepts {
+    /// Specifies the type `void`.
+    template <typename T>
+    concept Void = std::is_void_v<T>;
+
     template <typename T>
     concept StringLike = requires {
       typename std::remove_cvref_t<T>::value_type;
@@ -286,7 +290,7 @@ namespace rcx {
     /// Specifies the types that can be converted from Ruby values.
     ///
     template <typename T>
-    concept ConvertibleFromValue = requires(Value v) { from_Value<T>(v); };
+    concept ConvertibleFromValue = !std::is_void_v<T> && requires(Value v) { from_Value<T>(v); };
 
     /// Specifies the types that can be converted into Ruby values.
     ///
@@ -534,9 +538,39 @@ namespace rcx {
       ClassT<Derived> get_class() const;
       Derived freeze() const;
 
+      /// Defines a singleton method for the object.
+      ///
+      /// @warning Defining a method this way allocates a resource that will never be
+      ///   garbage-collected.
+      ///
+      /// @tparam Self The type of the receiver.
+      /// @tparam ArgSpec The types of the method arguments.
+      /// @param mid The name of the method.
+      /// @param function The C++ function to be invoked. It should accept `Self` as
+      ///   the first argument, followed by the arguments defined by `argspec`.
+      /// @param argspec The argument specifications for the method.
+      /// @return Returns the receiver.
       template <concepts::ConvertibleFromValue Self = Derived, concepts::ArgSpec... ArgSpec>
       Derived define_singleton_method(concepts::Identifier auto &&mid,
           std::invocable<Self, typename ArgSpec::ResultType...> auto &&function,
+          ArgSpec... argspec) const;
+
+      /// @overload
+      ///
+      /// This overload defines a method that does not use the receiver.
+      ///
+      /// @warning Defining a method this way allocates a resource that will never be
+      ///   garbage-collected.
+      ///
+      /// @tparam Self Must be `void`.
+      /// @param mid The name of the method.
+      /// @param function The C++ function to be invoked. It should accept the
+      ///   arguments defined by `argspec`.
+      /// @param argspec The argument specifications for the method.
+      /// @return Returns the receiver.
+      template <concepts::Void Self, concepts::ArgSpec... ArgSpec>
+      Derived define_singleton_method(concepts::Identifier auto &&mid,
+          std::invocable<typename ArgSpec::ResultType...> auto &&function,
           ArgSpec... argspec) const;
     };
 
@@ -633,6 +667,23 @@ namespace rcx {
       template <concepts::ConvertibleFromValue Self = Value, concepts::ArgSpec... ArgSpec>
       Module define_method(concepts::Identifier auto &&mid,
           std::invocable<Self, typename ArgSpec::ResultType...> auto &&function,
+          ArgSpec... argspec) const;
+
+      /// @overload
+      ///
+      /// This overload defines a method that does not use the receiver.
+      ///
+      /// @warning Defining method this way allocates a resource that will never be
+      /// garbage-collected.
+      ///
+      /// @tparam Self Must be `void`.
+      /// @param mid The name of the method.
+      /// @param function The function to be called.
+      /// @param argspec List of argument specifications.
+      /// @return Self.
+      template <concepts::Void Self, concepts::ArgSpec... ArgSpec>
+      Module define_method(concepts::Identifier auto &&mid,
+          std::invocable<typename ArgSpec::ResultType...> auto &&function,
           ArgSpec... argspec) const;
 
       /// Checks if a constant is defined under this module.

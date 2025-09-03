@@ -621,6 +621,21 @@ namespace rcx {
       return *static_cast<Derived const *>(this);
     }
 
+    template <typename Derived, std::derived_from<ValueBase> Super, Nilability nilable>
+    template <concepts::Void, concepts::ArgSpec... ArgSpec>
+    inline Derived ValueT<Derived, Super, nilable>::define_singleton_method(
+        concepts::Identifier auto &&mid,
+        std::invocable<typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
+      auto const callback =
+          detail::method_callback<ArgSpec...>::alloc(std::forward<decltype(function)>(function));
+      detail::protect([&]() noexcept {
+        auto const singleton = ::rb_singleton_class(this->as_VALUE());
+        rb_define_method_id(
+            singleton, detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
+      });
+      return *static_cast<Derived const *>(this);
+    }
+
     /// Value
 
     template <concepts::ConvertibleFromValue R>
@@ -708,6 +723,17 @@ namespace rcx {
     inline Module Module::define_method(concepts::Identifier auto &&mid,
         std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
       auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(function);
+      detail::protect([&]() noexcept {
+        rb_define_method_id(
+            as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
+      });
+      return *this;
+    }
+
+    template <concepts::Void, concepts::ArgSpec... ArgSpec>
+    inline Module Module::define_method(concepts::Identifier auto &&mid,
+        std::invocable<typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
+      auto const callback = detail::method_callback<ArgSpec...>::alloc(function);
       detail::protect([&]() noexcept {
         rb_define_method_id(
             as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
