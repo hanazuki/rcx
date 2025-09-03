@@ -3,7 +3,7 @@
 #include <rcx/rcx.hpp>
 
 void Init_examples_class() {
-  using namespace rcx::arg;
+  using namespace rcx::args;
 
   auto ruby = rcx::Ruby::get();
   auto cls =

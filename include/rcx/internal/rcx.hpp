@@ -320,7 +320,7 @@ namespace rcx {
 
   /// Argument parsing.
   ///
-  namespace arg {
+  namespace args {
     template <concepts::ConvertibleFromValue T = Value> struct Self {
       using ResultType = detail::wrap_ref_t<T>;
       static ResultType parse(Ruby &, Value self, std::span<Value> &args);

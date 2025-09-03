@@ -235,7 +235,7 @@ namespace rcx {
         std::conditional_t<std::derived_from<T, typed_data::WrappedStructBase>, T const &, T const>;
   };
 
-  namespace arg {
+  namespace args {
     template <concepts::ConvertibleFromValue T>
     inline typename Self<T>::ResultType Self<T>::parse(Ruby &, Value self, std::span<Value> &) {
       return from_Value<T>(self);
@@ -611,7 +611,7 @@ namespace rcx {
     inline Derived ValueT<Derived, Super, nilable>::define_singleton_method(
         concepts::Identifier auto &&mid,
         std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
-      auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(
+      auto const callback = detail::method_callback<args::Self<Self>, ArgSpec...>::alloc(
           std::forward<decltype(function)>(function));
       detail::protect([&]() noexcept {
         auto const singleton = ::rb_singleton_class(this->as_VALUE());
@@ -722,7 +722,7 @@ namespace rcx {
     template <concepts::ConvertibleFromValue Self, concepts::ArgSpec... ArgSpec>
     inline Module Module::define_method(concepts::Identifier auto &&mid,
         std::invocable<Self, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
-      auto const callback = detail::method_callback<arg::Self<Self>, ArgSpec...>::alloc(function);
+      auto const callback = detail::method_callback<args::Self<Self>, ArgSpec...>::alloc(function);
       detail::protect([&]() noexcept {
         rb_define_method_id(
             as_VALUE(), detail::into_ID(std::forward<decltype(mid)>(mid)), callback, -1);
@@ -818,7 +818,7 @@ namespace rcx {
     inline ClassT<T> ClassT<T>::define_method(concepts::Identifier auto &&mid,
         std::invocable<T &, typename ArgSpec::ResultType...> auto &&function, ArgSpec...) const {
       auto const callback =
-          detail::method_callback<arg::Self<detail::self_type<T>>, ArgSpec...>::alloc(
+          detail::method_callback<args::Self<detail::self_type<T>>, ArgSpec...>::alloc(
               std::forward<decltype(function)>(function));
       detail::protect([&]() noexcept {
         rb_define_method_id(
@@ -833,7 +833,7 @@ namespace rcx {
         std::invocable<T const &, typename ArgSpec::ResultType...> auto &&function,
         ArgSpec...) const {
       auto const callback =
-          detail::method_callback<arg::Self<detail::self_type_const<T>>, ArgSpec...>::alloc(
+          detail::method_callback<args::Self<detail::self_type_const<T>>, ArgSpec...>::alloc(
               function);
       detail::protect([&]() noexcept {
         rb_define_method_id(
@@ -846,7 +846,7 @@ namespace rcx {
     template <concepts::ArgSpec... ArgSpec>
       requires std::constructible_from<T, typename ArgSpec::ResultType...>
     inline ClassT<T> ClassT<T>::define_constructor(ArgSpec...) const {
-      auto const callback = detail::method_callback<arg::Self<Value>, ArgSpec...>::alloc(
+      auto const callback = detail::method_callback<args::Self<Value>, ArgSpec...>::alloc(
           typed_data::DataType<T>::template initialize<typename ArgSpec::ResultType...>);
       detail::protect([&]() noexcept {
         using namespace literals;
@@ -859,7 +859,7 @@ namespace rcx {
     inline ClassT<T> ClassT<T>::define_copy_constructor() const
       requires std::copy_constructible<T>
     {
-      auto const callback = detail::method_callback<arg::Self<Value>, arg::Arg<T const &>>::alloc(
+      auto const callback = detail::method_callback<args::Self<Value>, args::Arg<T const &>>::alloc(
           typed_data::DataType<T>::initialize_copy);
       detail::protect([&]() noexcept {
         using namespace literals;

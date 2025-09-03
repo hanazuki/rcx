@@ -143,7 +143,7 @@ Value Test::test_class(Value self) {
 }
 
 Value Test::test_ivar(Value self) {
-  using namespace rcx::arg;
+  using namespace rcx::args;
 
   auto cls = Class::new_class()
                  .define_method(
@@ -167,7 +167,7 @@ Value Test::test_const(Value self) {
 }
 
 Value Test::test_singleton_method(Value self) {
-  using namespace rcx::arg;
+  using namespace rcx::args;
 
   auto obj = rcx::builtin::Object.new_instance();
 
@@ -193,7 +193,7 @@ Value Test::test_singleton_method(Value self) {
 }
 
 Value Test::test_singleton_method_without_self(Value self) {
-  using namespace rcx::arg;
+  using namespace rcx::args;
 
   auto obj = rcx::builtin::Object.new_instance();
 
@@ -336,7 +336,7 @@ Value Test::test_format([[maybe_unused]] Value self) {
 }
 
 Value Test::test_args([[maybe_unused]] Value self) {
-  using namespace rcx::arg;
+  using namespace rcx::args;
   auto cls = Class::new_class();
   cls.define_method(
       "args_splat",
@@ -506,7 +506,7 @@ std::tuple<Associated const &, Associated const &> Associated::swap(
 }
 
 extern "C" void Init_test() {
-  using namespace rcx::arg;
+  using namespace rcx::args;
 
   auto &ruby = rcx::Ruby::get();
 
