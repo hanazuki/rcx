@@ -21,6 +21,7 @@ struct Test {
   static Value test_ivar(Value self);
   static Value test_const(Value self);
   static Value test_singleton_method(Value self);
+  static Value test_singleton_method_without_self(Value self);
   static Value test_array(Value self);
   static Value test_leak(Value self);
   static Value test_allocate(Value self);

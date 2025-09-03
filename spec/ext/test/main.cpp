@@ -169,23 +169,39 @@ Value Test::test_const(Value self) {
 Value Test::test_singleton_method(Value self) {
   using namespace rcx::arg;
 
-  self.define_singleton_method(
+  auto obj = rcx::builtin::Object.new_instance();
+
+  obj.define_singleton_method(
       "m1",
       [&](Value self_, Symbol sym) {
-        self.send("assert_same", self, self_);
+        self.send("assert_same", obj, self_);
         return sym;
       },
       arg<Symbol>);
-  self.send("assert_equal", "ok"_sym, self.send("m1", "ok"_sym));
+  self.send("assert_equal", "ok"_sym, obj.send("m1", "ok"_sym));
 
-  self.define_singleton_method("m2", [](Value, int n) { return n * 3; }, arg<int>);
-  self.send("assert_equal", 30, self.send("m2", 10));
+  obj.define_singleton_method("m2", [](Value, int n) { return n * 3; }, arg<int>);
+  self.send("assert_equal", 30, obj.send("m2", 10));
 
   {
     auto str = "test"_str;
     str.define_singleton_method("foo", [](String s) { return s.send("*", 2); });
     self.send("assert_equal", "testtest"_str, str.send<String>("foo"));
   }
+
+  return Value::qtrue;
+}
+
+Value Test::test_singleton_method_without_self(Value self) {
+  using namespace rcx::arg;
+
+  auto obj = rcx::builtin::Object.new_instance();
+
+  obj.define_singleton_method<void>("m3", []() { return "hello"_str; });
+  self.send("assert_equal", "hello"_str, obj.send("m3"));
+
+  obj.define_singleton_method<void>("m4", [](int n) { return n * 4; }, arg<int>);
+  self.send("assert_equal", 40, obj.send("m4", 10));
 
   return Value::qtrue;
 }
@@ -441,49 +457,43 @@ Associated &Associated::return_self() {
 
 Value Test::test_gvl(Value self) {
   // Test basic functionality with void return type (returns bool)
-  bool void_executed = rcx::gvl::without_gvl([]() {
-    // This callback should execute successfully
-  }, rcx::gvl::ReleaseFlags::None);
+  bool void_executed = rcx::gvl::without_gvl(
+      []() {
+        // This callback should execute successfully
+      },
+      rcx::gvl::ReleaseFlags::None);
   self.send("assert", void_executed);
 
   // Test with return value (returns std::optional<T>)
-  auto result = rcx::gvl::without_gvl([]() {
-    return 42;
-  }, rcx::gvl::ReleaseFlags::None);
+  auto result = rcx::gvl::without_gvl([]() { return 42; }, rcx::gvl::ReleaseFlags::None);
   self.send("assert", result.has_value());
   self.send("assert_equal", 42, result.value());
 
   // Test with flags using 2-parameter overload
-  auto string_result = rcx::gvl::without_gvl([]() {
-    return std::string("Hello from without GVL!");
-  }, rcx::gvl::ReleaseFlags::None);
+  auto string_result = rcx::gvl::without_gvl(
+      []() { return std::string("Hello from without GVL!"); }, rcx::gvl::ReleaseFlags::None);
   self.send("assert", string_result.has_value());
-  self.send("assert_equal", String::copy_from("Hello from without GVL!"), String::copy_from(string_result.value()));
+  self.send("assert_equal", String::copy_from("Hello from without GVL!"),
+      String::copy_from(string_result.value()));
 
   // Test flag combinations using 2-parameter overload
-  auto flag_result = rcx::gvl::without_gvl([]() {
-    return 123;
-  }, rcx::gvl::ReleaseFlags::IntrFail | rcx::gvl::ReleaseFlags::Offloadable);
+  auto flag_result = rcx::gvl::without_gvl(
+      []() { return 123; }, rcx::gvl::ReleaseFlags::IntrFail | rcx::gvl::ReleaseFlags::Offloadable);
   self.send("assert", flag_result.has_value());
   self.send("assert_equal", 123, flag_result.value());
 
   // Test with UBF
   bool ubf_called = false;
-  auto ubf = [&ubf_called]() {
-    ubf_called = true;
-  };
-  
-  auto ubf_result = rcx::gvl::without_gvl([]() {
-    return 456;
-  }, ubf, rcx::gvl::ReleaseFlags::None);
+  auto ubf = [&ubf_called]() { ubf_called = true; };
+
+  auto ubf_result = rcx::gvl::without_gvl([]() { return 456; }, ubf, rcx::gvl::ReleaseFlags::None);
   self.send("assert", ubf_result.has_value());
   self.send("assert_equal", 456, ubf_result.value());
   // Note: UBF may or may not be called depending on timing, so we don't assert on ubf_called
 
   // Test with both UBF and flags
-  auto both_result = rcx::gvl::without_gvl([]() {
-    return 789;
-  }, [](){ /* UBF function */ }, rcx::gvl::ReleaseFlags::Offloadable);
+  auto both_result = rcx::gvl::without_gvl(
+      []() { return 789; }, []() { /* UBF function */ }, rcx::gvl::ReleaseFlags::Offloadable);
   self.send("assert", both_result.has_value());
   self.send("assert_equal", 789, both_result.value());
 
@@ -509,6 +519,8 @@ extern "C" void Init_test() {
                    .define_method("test_ivar", &Test::test_ivar)
                    .define_method("test_const", &Test::test_const)
                    .define_method("test_singleton_method", &Test::test_singleton_method)
+                   .define_method("test_singleton_method_without_self",
+                       &Test::test_singleton_method_without_self)
                    .define_method("test_leak", &Test::test_leak)
                    .define_method("test_allocate", &Test::test_allocate)
                    .define_method("test_io_buffer", &Test::test_io_buffer)
