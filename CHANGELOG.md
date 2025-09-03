@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+## v0.4.0 (2025-09-03)
+- Renamed `rcx::arg` namespace to `rcx::args` to prevent conflit with `rcx::arg::arg`.
+
 ## v0.3.1 (2025-09-02)
 - Now `extconf.rb`'s can only `require 'rcx/mkmf/c++20'` to enable RCX.
 
