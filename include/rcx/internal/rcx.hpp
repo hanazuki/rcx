@@ -71,14 +71,6 @@ namespace rcx {
     template <typename T>
     concept Void = std::is_void_v<T>;
 
-    template <typename T>
-    concept StringLike = requires {
-      typename std::remove_cvref_t<T>::value_type;
-      typename std::remove_cvref_t<T>::traits_type;
-      typename std::basic_string_view<typename std::remove_cvref_t<T>::value_type,
-          typename std::remove_cvref_t<T>::traits_type>;
-    };
-
     /// Specifies the types that can be used as Ruby identifiers.
     ///
     /// This includes \ref rcx::Id, \ref rcx::value::Symbol and C++ strings.
@@ -409,6 +401,16 @@ namespace rcx {
     concept CharLike = requires {
       requires CharTraits<::rcx::CharTraits<std::remove_cvref_t<T>>>;
       typename std::basic_string_view<std::remove_cvref_t<T>>;
+    };
+
+    /// Specifies the string types that can be mapped to Ruby strings.
+    ///
+    template <typename T>
+    concept StringLike = requires {
+      requires CharLike<typename std::remove_cvref_t<T>::value_type>;
+      typename std::remove_cvref_t<T>::traits_type;
+      typename std::basic_string_view<typename std::remove_cvref_t<T>::value_type,
+          typename std::remove_cvref_t<T>::traits_type>;
     };
   };
 
