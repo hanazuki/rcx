@@ -1,4 +1,5 @@
 ## UNRELEASED
+- Fixed the type of `rcx::builtin::IOBuffer`.
 
 ## v0.4.0 (2025-09-03)
 - Renamed `rcx::arg` namespace to `rcx::args` to prevent conflit with `rcx::arg::arg`.

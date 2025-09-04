@@ -1346,7 +1346,8 @@ namespace rcx {
 #ifdef RCX_IO_BUFFER
     /// `IO::Buffer` class
     ///
-    inline value::Class const IOBuffer = detail::unsafe_coerce<value::Class>(::rb_cIOBuffer);
+    inline value::ClassT<value::IOBuffer> const IOBuffer =
+        detail::unsafe_coerce<value::ClassT<value::IOBuffer>>(::rb_cIOBuffer);
 #endif
   };
 
