@@ -1154,7 +1154,8 @@ namespace rcx {
     inline value::Class const Encoding = detail::unsafe_coerce<value::Class>(::rb_cEncoding);
     /// `Symbol` class
     ///
-    inline value::Class const Symbol = detail::unsafe_coerce<value::Class>(::rb_cSymbol);
+    inline value::ClassT<value::Symbol> const Symbol =
+        detail::unsafe_coerce<value::ClassT<value::Symbol>>(::rb_cSymbol);
     /// `Regexp` class
     ///
     inline value::Class const Regexp = detail::unsafe_coerce<value::Class>(::rb_cRegexp);
@@ -1194,10 +1195,12 @@ namespace rcx {
     inline value::Class const Range = detail::unsafe_coerce<value::Class>(::rb_cRange);
     /// `IO` class
     ///
-    inline value::Class const IO = detail::unsafe_coerce<value::Class>(::rb_cIO);
+    inline value::ClassT<value::IO> const IO =
+        detail::unsafe_coerce<value::ClassT<value::IO>>(::rb_cIO);
     /// `File` class
     ///
-    inline value::Class const File = detail::unsafe_coerce<value::Class>(::rb_cFile);
+    inline value::ClassT<value::IO> const File =
+        detail::unsafe_coerce<value::ClassT<value::IO>>(::rb_cFile);
     /// `Thread` class
     ///
     inline value::Class const Thread = detail::unsafe_coerce<value::Class>(::rb_cThread);
