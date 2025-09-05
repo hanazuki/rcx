@@ -1,4 +1,6 @@
 ## UNRELEASED
+
+## v0.4.1 (2025-09-06)
 - Improved the types of the builtin classes to properly relate to the value wrappers.
 
 ## v0.4.0 (2025-09-03)
