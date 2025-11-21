@@ -31,6 +31,7 @@ struct Test {
   static Value test_exception(Value self);
   static Value test_io(Value self);
   static Value test_gvl(Value self);
+  static Value test_optional(Value self);
 };
 
 class Base: public WrappedStruct<> {

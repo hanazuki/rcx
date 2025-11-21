@@ -1,5 +1,6 @@
 ## UNRELEASED
 - Fix UB in `rcx::protect`.
+- Fix conversion of std::optional from/into Ruby Value.
 
 ## v0.4.1 (2025-09-06)
 - Improved the types of the builtin classes to properly relate to the value wrappers.
