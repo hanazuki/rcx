@@ -170,7 +170,7 @@ namespace rcx {
         return;
       } else {
         std::optional<Result> result;
-        auto callback = [&functor, &result]() { *result = functor(); };
+        auto callback = [&functor, &result]() { result = functor(); };
         using Callback = decltype(callback);
 
         ::rb_protect(
