@@ -1245,12 +1245,12 @@ namespace rcx {
 
   template <concepts::ConvertibleFromValue T>
   decltype(auto) FromValue<std::optional<T>>::convert(Value v) {
-    return v.is_nil() ? std::nullopt : from_Value<T>(v);
+    return v.is_nil() ? std::optional<T>{} : from_Value<T>(v);
   }
 
   template <concepts::ConvertibleIntoValue T>
   Value IntoValue<std::optional<T>>::convert(std::optional<T> value) {
-    return value ? Value::qnil : into_Value(*value);
+    return value ? into_Value(*value) : Value::qnil;
   }
 
   template <concepts::ConvertibleFromValue... T>

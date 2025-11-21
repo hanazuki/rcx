@@ -455,6 +455,51 @@ Associated &Associated::return_self() {
   return *this;
 }
 
+Value Test::test_optional(Value self) {
+  // into_value
+  {
+    std::optional<int> v = 42;
+    self.send("assert_equal", 42, rcx::into_Value(v));
+  }
+  {
+    std::optional<int> v = std::nullopt;
+    self.send("assert_nil", rcx::into_Value(v));
+  }
+  {
+    std::optional<String> v = "hello"_str;
+    self.send("assert_equal", "hello"_str, rcx::into_Value(v));
+  }
+  {
+    std::optional<String> v = std::nullopt;
+    self.send("assert_nil", rcx::into_Value(v));
+  }
+
+  // from_value
+  {
+    auto v = rcx::from_Value<std::optional<int>>(self.send("eval", "42"_str));
+    ASSERT(v.has_value());
+    ASSERT_EQ(42, *v);
+  }
+  {
+    auto v = rcx::from_Value<std::optional<int>>(Value::qnil);
+    ASSERT_NOT(v.has_value());
+  }
+  {
+    auto v = rcx::from_Value<std::optional<String>>(self.send("eval", "'hello'"_str));
+    ASSERT(v.has_value());
+    self.send("assert_equal", "hello"_str, *v);
+  }
+  {
+    auto v = rcx::from_Value<std::optional<String>>(Value::qnil);
+    ASSERT_NOT(v.has_value());
+  }
+  {
+    ASSERT_RAISE([&] { rcx::from_Value<std::optional<int>>("foo"_str); });
+  }
+
+  return Value::qtrue;
+}
+
 Value Test::test_gvl(Value self) {
   // Test basic functionality with void return type (returns bool)
   bool void_executed = rcx::gvl::without_gvl(
@@ -528,6 +573,7 @@ extern "C" void Init_test() {
                    .define_method("test_args", &Test::test_args)
                    .define_method("test_exception", &Test::test_exception)
                    .define_method("test_io", &Test::test_io)
+                   .define_method("test_optional", &Test::test_optional)
                    .define_method("test_gvl", &Test::test_gvl);
 
   cBase = ruby.define_class<Base>("Base")
