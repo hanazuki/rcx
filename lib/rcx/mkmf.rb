@@ -9,6 +9,8 @@ module RCX
     'c++23' => %w[--std=c++23 --std=c++2b].freeze,
     'c++26' => %w[--std=c++26 --std=c++2c].freeze,
   }.freeze
+  # Ruby < 3.4.2 includes <cstdbool>, which warns with newer libstdc++.
+  CXX_FLAG_PROBE_WERROR = (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 4, 2]) >= 0
 
   root = File.join(__dir__, '../..')
   INCDIR = File.join(root, 'include').shellescape
@@ -19,7 +21,9 @@ module RCX
 
     def setup_rcx(cxx_standard: 'c++20')
       CXX_STANDARD_FLAGS.fetch(cxx_standard).find do |flag|
-        if checking_for("whether #{flag} is accepted as CXXFLAGS") { try_cflags(flag) }
+        if checking_for("whether #{flag} is accepted as CXXFLAGS") {
+            try_cflags(flag, werror: CXX_FLAG_PROBE_WERROR)
+          }
           $CXXFLAGS << " " << flag
           true
         else

@@ -8,7 +8,7 @@ require 'rcx/mkmf/c++20'
   -Werror=return-type
   -Werror=nullability-completeness
 ].each do |f|
-  if checking_for("#{f} flag") { try_cflags(f) }
+  if checking_for("#{f} flag") { try_cflags(f, werror: RCX::CXX_FLAG_PROBE_WERROR) }
     $CXXFLAGS << " #{f}"
   end
 end
