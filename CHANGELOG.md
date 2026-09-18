@@ -1,4 +1,6 @@
 ## UNRELEASED
+
+## v0.4.2.alpha1 (2026-09-18)
 - Fix UB in `rcx::protect`.
 - Fix conversion of std::optional from/into Ruby Value.
 - Support IO::Buffer version 3 (expected to be shipped with Ruby 4.1)
