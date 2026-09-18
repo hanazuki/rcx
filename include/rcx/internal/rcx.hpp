@@ -31,7 +31,7 @@
 #define RCX_Nonnull
 #endif
 
-#if RUBY_IO_BUFFER_VERSION == 2
+#if RUBY_IO_BUFFER_VERSION == 2 || RUBY_IO_BUFFER_VERSION == 3
 #define RCX_IO_BUFFER
 #endif
 
