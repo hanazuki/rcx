@@ -1,0 +1,7 @@
+[bumpVersion]
+	scheme = zero
+	tagPrefix = v
+	path = lib/rcx/version.rb
+	pattern = "VERSION = -'(?<version>.+?)'"
+	postCommand = bundle lock
+	postCommand = "ruby -e 'today = Time.now.strftime(%[%Y-%m-%d]); ARGV.each {|path| File.write(path, File.read(path).sub(/## Unreleased\\n\\K/i, %|\\n## v#{ENV.fetch(%[NEW_VERSION])} (#{today})\\n|)) }' CHANGELOG.md"
